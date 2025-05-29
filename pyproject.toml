@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "ikin-stock-scrapper"
+version = "0.1.0"
+description = "A scrapper to gather data about cash dividen, top 100 stockholder, annual report, querterly report, public ownership report from edge.pse.com.ph"
+authors = ["Muhammad Zahid Masruri <masruri03@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
