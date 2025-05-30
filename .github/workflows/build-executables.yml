@@ -1,0 +1,124 @@
+name: Build Cross-Platform Executables
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version tag'
+        required: false
+        default: 'latest'
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux-x64
+            artifact_name: pse-scraper-linux-x64
+          - os: windows-latest
+            platform: windows-x64
+            artifact_name: pse-scraper-windows-x64.exe
+          - os: macos-latest
+            platform: macos-x64
+            artifact_name: pse-scraper-macos-x64
+          - os: macos-14  # ARM64 runner
+            platform: macos-arm64
+            artifact_name: pse-scraper-macos-arm64
+
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+      with:
+        version: latest
+        virtualenvs-create: true
+        virtualenvs-in-project: true
+    
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: .venv
+        key: ${{ runner.os }}-poetry-${{ hashFiles('poetry.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-poetry-
+    
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry run pip install pyinstaller
+    
+    - name: Build executable
+      run: |
+        poetry run python build_executable.py --clean
+    
+    - name: Test executable (Unix)
+      if: runner.os != 'Windows'
+      run: |
+        chmod +x releases/${{ matrix.artifact_name }}
+        ./releases/${{ matrix.artifact_name }} --version
+    
+    - name: Test executable (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        .\releases\${{ matrix.artifact_name }} --version
+    
+    - name: Upload artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: ${{ matrix.artifact_name }}
+        path: releases/${{ matrix.artifact_name }}
+        retention-days: 30
+    
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: releases/${{ matrix.artifact_name }}
+        draft: false
+        prerelease: false
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  create-checksums:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+      with:
+        path: ./artifacts
+    
+    - name: Create checksums
+      run: |
+        cd artifacts
+        find . -type f -exec sha256sum {} \; > ../checksums.txt
+        cd ..
+        echo "## SHA256 Checksums" >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+        cat checksums.txt >> release_notes.md
+        echo "\`\`\`" >> release_notes.md
+    
+    - name: Update Release with checksums
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          checksums.txt
+        body_path: release_notes.md
+        append_body: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

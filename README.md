@@ -1,6 +1,53 @@
 # PSE Data Scraper
 
-A modern, modular Python web scraping project for Philippine Stock Exchange (PSE) data. This project has been completely restructured to follow Python best practices with a clean, maintainable architecture.
+A modern, modular Python web scraping ## 🛠 Installation
+
+### Option 1: Pre-built Executables (Recommended for End Users)
+
+Download platform-specific executables that don't require Python installation:
+
+1. **Go to the [Releases](../../releases) page**
+
+2. **Download the executable for your platform:**
+   - `pse-scraper-macos-arm64` (macOS Apple Silicon)
+   - `pse-scraper-macos-x64` (macOS Intel)
+   - `pse-scraper-linux-x64` (Linux 64-bit)
+   - `pse-scraper-windows-x64.exe` (Windows 64-bit)
+
+3. **Make it executable (Unix/Linux/macOS):**
+
+```bash
+chmod +x pse-scraper-*
+```
+
+4. **Run directly:**
+
+```bash
+./pse-scraper-* --help
+# or on Windows
+pse-scraper-windows-x64.exe --help
+```
+
+### Option 2: Development Installation
+
+1. **Clone the repository:**
+
+```bash
+git clone <repository-url>
+cd ikin-stock-scrapper
+```
+
+2. **Install dependencies using Poetry:**
+
+```bash
+poetry install
+```
+
+3. **Activate the virtual environment:**
+
+```bash
+poetry shell
+```ppine Stock Exchange (PSE) data. This project has been completely restructured to follow Python best practices with a clean, maintainable architecture.
 
 ## 🚀 Features
 
@@ -35,6 +82,29 @@ pse-scraper/
 
 ## 🛠 Installation
 
+### Option 1: Pre-built Executables (Recommended for End Users)
+
+Download platform-specific executables that don't require Python installation:
+
+1. **Go to the [Releases](../../releases) page**
+2. **Download the executable for your platform:**
+   - `pse-scraper-macos-arm64` (macOS Apple Silicon)
+   - `pse-scraper-macos-x64` (macOS Intel)
+   - `pse-scraper-linux-x64` (Linux 64-bit)
+   - `pse-scraper-windows-x64.exe` (Windows 64-bit)
+3. **Make it executable (Unix/Linux/macOS):**
+```bash
+chmod +x pse-scraper-*
+```
+4. **Run directly:**
+```bash
+./pse-scraper-* --help
+# or on Windows
+pse-scraper-windows-x64.exe --help
+```
+
+### Option 2: Development Installation
+
 1. **Clone the repository:**
 ```bash
 git clone <repository-url>
@@ -51,9 +121,41 @@ poetry install
 poetry shell
 ```
 
+### Option 3: Building Executables
+
+To build platform-specific executables yourself:
+
+```bash
+# Build for current platform
+make build
+
+# Or use the Python script directly
+poetry run python build_executable.py
+
+# Clean build and rebuild
+make build-clean
+```
+
+See [BUILD_EXECUTABLES.md](BUILD_EXECUTABLES.md) for detailed build instructions and cross-platform building.
+
 ## 📖 Usage
 
-PSE Data Scraper offers two modes of operation:
+PSE Data Scraper offers two modes of operation and can be used as a standalone executable or Python package:
+
+### 🚀 Quick Start with Executable
+
+If you downloaded a pre-built executable:
+
+```bash
+# Start interactive mode
+./pse-scraper-* 
+
+# Quick scrape example
+./pse-scraper-* scrape SM public_ownership --output sm_ownership
+
+# Get help
+./pse-scraper-* --help
+```
 
 ### 🖥️ Interactive Menu Mode (Default)
 
