@@ -17,10 +17,32 @@ if platform.system().lower() == "windows":
     import locale
     # Set environment variables for UTF-8 support
     os.environ["PYTHONIOENCODING"] = "utf-8"
+    os.environ["PYTHONUTF8"] = "1"
     # Reconfigure stdout/stderr for UTF-8
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
         sys.stderr.reconfigure(encoding='utf-8')
+
+
+def safe_print(message):
+    """Print message with emoji fallback for Windows encoding issues."""
+    try:
+        print(message)
+    except UnicodeEncodeError:
+        # Fallback: replace emojis with text equivalents
+        fallback_message = (message
+            .replace("🚀", "[BUILD]")
+            .replace("🧹", "[CLEAN]")
+            .replace("📦", "[PACKAGE]")
+            .replace("✅", "[SUCCESS]")
+            .replace("❌", "[ERROR]")
+            .replace("🔨", "[COMPILE]")
+            .replace("📊", "[INFO]")
+            .replace("🎉", "[DONE]")
+            .replace("📁", "[FILE]")
+            .replace("📋", "[NEXT]")
+        )
+        print(fallback_message)
 
 
 def get_platform_info():
@@ -55,26 +77,26 @@ def clean_build_dirs():
     
     for dir_name in dirs_to_clean:
         if os.path.exists(dir_name):
-            print(f"🧹 Cleaning {dir_name}/...")
+            safe_print(f"🧹 Cleaning {dir_name}/...")
             shutil.rmtree(dir_name)
 
 
 def install_dependencies():
     """Install build dependencies."""
-    print("📦 Installing build dependencies...")
+    safe_print("📦 Installing build dependencies...")
     try:
         subprocess.run([sys.executable, "-m", "pip", "install", "pyinstaller"], 
                       check=True, capture_output=True)
-        print("✅ Dependencies installed successfully")
+        safe_print("✅ Dependencies installed successfully")
     except subprocess.CalledProcessError as e:
-        print(f"❌ Failed to install dependencies: {e}")
+        safe_print(f"❌ Failed to install dependencies: {e}")
         return False
     return True
 
 
 def build_executable(platform_name):
     """Build the executable using PyInstaller."""
-    print(f"🔨 Building executable for {platform_name}...")
+    safe_print(f"🔨 Building executable for {platform_name}...")
     
     try:
         # Run PyInstaller with the spec file
@@ -89,16 +111,16 @@ def build_executable(platform_name):
         result = subprocess.run(cmd, check=True, capture_output=True, text=True)
         
         if result.returncode == 0:
-            print("✅ Build completed successfully")
+            safe_print("✅ Build completed successfully")
             return True
         else:
-            print(f"❌ Build failed with return code {result.returncode}")
+            safe_print(f"❌ Build failed with return code {result.returncode}")
             print(f"STDOUT: {result.stdout}")
             print(f"STDERR: {result.stderr}")
             return False
             
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed: {e}")
+        safe_print(f"❌ Build failed: {e}")
         if e.stdout:
             print(f"STDOUT: {e.stdout}")
         if e.stderr:
@@ -123,7 +145,7 @@ def create_release_package(platform_name):
     exe_path = dist_dir / exe_name
     
     if not exe_path.exists():
-        print(f"❌ Executable not found at {exe_path}")
+        safe_print(f"❌ Executable not found at {exe_path}")
         return False
     
     # Create platform-specific release name
@@ -140,8 +162,8 @@ def create_release_package(platform_name):
     if platform.system().lower() != "windows":
         os.chmod(release_path, 0o755)
     
-    print(f"📦 Release package created: {release_path}")
-    print(f"📊 File size: {release_path.stat().st_size / (1024*1024):.1f} MB")
+    safe_print(f"📦 Release package created: {release_path}")
+    safe_print(f"📊 File size: {release_path.stat().st_size / (1024*1024):.1f} MB")
     
     return True
 
@@ -154,7 +176,7 @@ def main():
     args = parser.parse_args()
     
     platform_name = get_platform_info()
-    print(f"🚀 Building PSE Scraper for {platform_name}")
+    safe_print(f"🚀 Building PSE Scraper for {platform_name}")
     
     if args.clean:
         clean_build_dirs()
@@ -169,9 +191,9 @@ def main():
     if not create_release_package(platform_name):
         sys.exit(1)
     
-    print("\n🎉 Build completed successfully!")
-    print(f"📁 Executable available in: releases/pse-scraper-{platform_name}")
-    print("\n📋 Next steps:")
+    safe_print("\n🎉 Build completed successfully!")
+    safe_print(f"📁 Executable available in: releases/pse-scraper-{platform_name}")
+    safe_print("\n📋 Next steps:")
     print("  1. Test the executable on your target platform")
     print("  2. Upload to GitHub releases or distribute as needed")
     print("  3. Create builds for other platforms if needed")

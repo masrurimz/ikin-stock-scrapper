@@ -86,11 +86,22 @@ jobs:
             exit 1
           fi
 
-      - name: Test executable
+      - name: Test executable (Unix)
+        if: runner.os != 'Windows'
         run: |
-          chmod +x releases/${{ matrix.artifact_name }} || true
+          chmod +x releases/${{ matrix.artifact_name }}
           ./releases/${{ matrix.artifact_name }} --version
           ./releases/${{ matrix.artifact_name }} --help
+
+      - name: Test executable (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:PYTHONIOENCODING = "utf-8"
+          $env:PYTHONUTF8 = "1"
+          chcp 65001 > $null
+          & ".\releases\${{ matrix.artifact_name }}" --version
+          & ".\releases\${{ matrix.artifact_name }}" --help
+        shell: pwsh
 
       - name: Get file info
         run: |
