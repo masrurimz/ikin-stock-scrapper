@@ -29,10 +29,19 @@ def main():
         cli_main()
     except ImportError as e:
         print(f"Import error: {e}")
+        print(f"Python path: {sys.path}")
+        print(f"Frozen: {getattr(sys, 'frozen', False)}")
+        print(f"Application path: {application_path}")
+        if hasattr(sys, '_MEIPASS'):
+            print(f"MEI temp path: {sys._MEIPASS}")
         print("Please ensure the PSE Scraper package is properly installed.")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
     except Exception as e:
         print(f"Error: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 if __name__ == '__main__':

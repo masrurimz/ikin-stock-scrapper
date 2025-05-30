@@ -6,7 +6,6 @@ import logging
 from pathlib import Path
 from typing import List, Tuple
 
-from rich.console import Console
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.panel import Panel
@@ -15,10 +14,7 @@ from rich.text import Text
 
 from .core import PSEDataScraper
 from .models.report_types import ReportType
-
-
-# Rich console for beautiful output
-console = Console()
+from .utils.console import console
 
 # Report type mappings
 REPORT_TYPES = {
