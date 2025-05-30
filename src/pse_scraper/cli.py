@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from rich.console import Console
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
@@ -90,30 +90,107 @@ def scrape(ctx: CLIContext, company: str, report_type: str, output: str,
     # Display configuration
     _display_scrape_config(company, report_type, output, formats, workers, use_proxies, enable_logging)
     
-    # Initialize scraper
-    with console.status("[bold green]Initializing scraper..."):
+    # Initialize scraper with CLI mode for quiet logging
+    with console.status(f"[bold green]Initializing scraper with {workers} worker(s)..."):
         scraper = PSEDataScraper(
             max_workers=workers,
             use_proxies=use_proxies,
-            enable_logging=enable_logging
+            enable_logging=enable_logging,
+            cli_mode=True  # Enable CLI mode for quiet logging
         )
     
     try:
-        # Start scraping with progress indication
+        # Start scraping with detailed modern progress
+        console.print(f"\n[bold green]🔍 Processing {company.upper()}...[/bold green]")
+        
+        # Create a progress tracking system
+        current_step = {"step": "", "detail": ""}
+        
+        def progress_callback(step_type: str, message: str):
+            current_step["step"] = step_type
+            current_step["detail"] = message
+        
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
             console=console,
-            transient=True
+            transient=False
         ) as progress:
-            task = progress.add_task(f"Scraping {company.upper()} data...", total=None)
-            scraper.scrape_data(company.upper(), REPORT_TYPES[report_type])
+            task = progress.add_task("", total=None)
+            
+            # Store original data count
+            initial_count = len(scraper.data)
+            
+            # Map progress steps to user-friendly messages
+            step_messages = {
+                "initializing": "🚀 Initializing scraper",
+                "searching": "🔍 Searching PSE database",
+                "parsing": "📄 Parsing search results", 
+                "processing": "📊 Analyzing report data",
+                "downloading": f"⬇️ Downloading reports ({workers} workers)" if workers > 1 else "⬇️ Downloading reports",
+                "success": "✅ Processing complete",
+                "empty": "⚠️ No data found",
+                "error": "❌ Error occurred",
+                "warning": "⚠️ Warning"
+            }
+            
+            # Create a thread to update progress
+            import threading
+            import time
+            
+            def update_progress():
+                while True:
+                    if current_step["step"] in step_messages:
+                        icon = step_messages[current_step["step"]]
+                        detail = current_step["detail"]
+                        progress.update(task, description=f"{icon} {detail}")
+                    time.sleep(0.1)
+                    if current_step["step"] in ["success", "empty", "error"]:
+                        break
+            
+            # Start progress update thread
+            progress_thread = threading.Thread(target=update_progress, daemon=True)
+            progress_thread.start()
+            
+            # Scrape data with callback
+            scraper.scrape_data(company.upper(), REPORT_TYPES[report_type], progress_callback)
+            
+            # Wait for progress thread to finish
+            progress_thread.join(timeout=1.0)
+            
+            # Final status update
+            records_found = len(scraper.data) - initial_count
+            if records_found > 0:
+                progress.update(task, description=f"✅ Complete: Found {records_found} record(s)")
+            else:
+                progress.update(task, description=f"⚠️ Complete: No data found")
         
-        # Save results
-        with console.status("[bold blue]Saving results..."):
-            scraper.save_results(output, list(formats))
+        # Show detailed results
+        records_found = len(scraper.data) - initial_count
+        if records_found > 0:
+            console.print(f"\n[green]✅ Successfully processed {company.upper()}[/green]")
+            console.print(f"   📊 Records found: {records_found}")
+            
+            # Show company details if available
+            if scraper.data:
+                latest_record = scraper.data[-1]
+                if 'stock name' in latest_record:
+                    console.print(f"   🏢 Company: {latest_record['stock name']}")
+                if 'disclosure date' in latest_record:
+                    console.print(f"   📅 Latest report: {latest_record['disclosure date']}")
+        else:
+            console.print(f"\n[yellow]⚠️ No data found for company '{company.upper()}'[/yellow]")
+            console.print("   💡 This might be because:")
+            console.print("      • Company symbol doesn't exist")
+            console.print("      • No reports of this type available")
+            console.print("      • Company ID is invalid")
+            console.print("      • Try checking PSE website directly")
         
-        # Display results
+        # Save results with progress
+        console.print(f"\n[bold blue]💾 Saving results...[/bold blue]")
+        scraper.save_results(output, list(formats))
+        
+        # Display final results
         _display_results(scraper.data, output, formats)
         
     except KeyboardInterrupt:
@@ -171,31 +248,87 @@ def bulk(ctx: CLIContext, start_id: int, end_id: int, report_type: str,
     # Display configuration
     _display_bulk_config(start_id, end_id, report_type, output, formats, workers, use_proxies, enable_logging)
     
-    # Initialize scraper
-    with console.status("[bold green]Initializing scraper..."):
+    # Initialize scraper with CLI mode for quiet logging
+    with console.status(f"[bold green]Initializing scraper with {workers} worker(s)..."):
         scraper = PSEDataScraper(
             max_workers=workers,
             use_proxies=use_proxies,
-            enable_logging=enable_logging
+            enable_logging=enable_logging,
+            cli_mode=True  # Enable CLI mode for quiet logging
         )
     
     try:
-        # Bulk scraping with progress bar
+        # Show what we're about to process
+        console.print(f"\n[bold green]🚀 BULK PROCESSING: {company_count} companies (ID {start_id} - {end_id})[/bold green]")
+        
+        # Bulk scraping with detailed progress bar and modern step-by-step progress
         with Progress(
             TextColumn("[progress.description]{task.description}"),
             BarColumn(),
             TaskProgressColumn(),
+            TimeElapsedColumn(),
             console=console
         ) as progress:
-            task = progress.add_task("Processing companies...", total=company_count)
+            main_task = progress.add_task("Starting bulk processing...", total=company_count)
+            detail_task = progress.add_task("", total=None)
             
             for i, company_id in enumerate(range(start_id, end_id + 1), 1):
-                progress.update(task, description=f"Processing company ID {company_id}")
-                scraper.scrape_data(str(company_id), REPORT_TYPES[report_type])
-                progress.advance(task)
+                # Update main progress with current company
+                progress.update(main_task, description=f"Processing company ID {company_id} ({i}/{company_count})")
+                
+                # Store data count before processing this company
+                initial_count = len(scraper.data)
+                
+                # Create progress callback for detailed steps
+                def progress_callback(step_type: str, message: str):
+                    step_messages = {
+                        "initializing": "🚀 Initializing",
+                        "searching": "🔍 Searching PSE database",
+                        "parsing": "📄 Parsing results",
+                        "processing": "📊 Analyzing data",
+                        "downloading": f"⬇️ Downloading reports" + (f" ({scraper.max_workers} workers)" if scraper.max_workers > 1 else ""),
+                        "success": "✅ Complete",
+                        "empty": "⚠️ No data found",
+                        "error": "❌ Error",
+                        "warning": "⚠️ Warning"
+                    }
+                    icon = step_messages.get(step_type, "⏳")
+                    progress.update(detail_task, description=f"   {icon} {message}")
+                
+                # Process the company with detailed progress
+                scraper.scrape_data(str(company_id), REPORT_TYPES[report_type], progress_callback)
+                
+                # Check if we found data for this company
+                records_found = len(scraper.data) - initial_count
+                if records_found > 0:
+                    progress.update(detail_task, description=f"   ✅ ID {company_id}: Found {records_found} record(s)")
+                else:
+                    progress.update(detail_task, description=f"   ⚠️ ID {company_id}: No data found")
+                
+                progress.advance(main_task)
+                
+                # Brief pause to show the status
+                import time
+                time.sleep(0.2)
+        
+        # Summary of results
+        total_records = len(scraper.data)
+        companies_with_data = len(set(record.get('stock name', '') for record in scraper.data if record.get('stock name')))
+        
+        if total_records > 0:
+            console.print(f"\n[green]✅ BULK PROCESSING COMPLETED![/green]")
+            console.print(f"   📊 Total records found: {total_records}")
+            console.print(f"   🏢 Companies with data: {companies_with_data}")
+            console.print(f"   📈 Success rate: {(companies_with_data/company_count)*100:.1f}%")
+        else:
+            console.print(f"\n[yellow]⚠️ No data found for any companies in range {start_id}-{end_id}[/yellow]")
+            console.print("   This might be because:")
+            console.print("   • Company IDs don't exist in the range")
+            console.print("   • No reports of this type available")
+            console.print("   • Try a different ID range or report type")
         
         # Save results
-        with console.status("[bold blue]Saving results..."):
+        with console.status("[bold blue]💾 Saving results..."):
             scraper.save_results(output, list(formats))
         
         # Display results
@@ -332,51 +465,54 @@ def _display_results(data: List, output: str, formats: List[str],
             "This could mean:\n"
             "• The company ID/symbol doesn't exist\n"
             "• No reports of this type are available\n" 
-            "• The company hasn't filed recent reports",
+            "• The company hasn't filed recent reports\n"
+            "• Try a different company ID or report type",
             title="Results",
             style="red"
         ))
     else:
+        # Get some details about the data
+        companies_found = len(set(record.get('stock name', '') for record in data if record.get('stock name')))
+        
         result_text = f"[bold green]✅ PROCESSING COMPLETED![/bold green]\n\n"
         result_text += f"📊 Records found: [bold]{len(data)}[/bold]\n"
-        result_text += f"💾 Saved to: [bold]{output}.{'/'.join(formats)}[/bold]"
         
         if is_bulk:
-            result_text += f"\n🏢 Companies processed: [bold]{company_count}[/bold]"
+            result_text += f"🏢 Companies processed: [bold]{company_count}[/bold]\n"
+            result_text += f"📈 Companies with data: [bold]{companies_found}[/bold]\n"
+            result_text += f"🎯 Success rate: [bold]{(companies_found/company_count)*100:.1f}%[/bold]\n"
+        elif companies_found > 0:
+            # Show company names found
+            company_names = [record.get('stock name', '') for record in data if record.get('stock name')]
+            if company_names:
+                unique_companies = list(set(company_names))
+                if len(unique_companies) <= 3:
+                    result_text += f"🏢 Company: [bold]{', '.join(unique_companies)}[/bold]\n"
+                else:
+                    result_text += f"🏢 Companies: [bold]{len(unique_companies)} found[/bold]\n"
+        
+        result_text += f"💾 Saved to: [bold]{output}.{'/'.join(formats)}[/bold]"
             
         console.print(Panel(result_text, title="Results", style="green"))
 
 
 def _run_interactive_mode(ctx: CLIContext):
     """Run the interactive CLI mode."""
-    # Setup logging
-    from .utils.logging_config import setup_logging
-    logger = setup_logging(ctx.enable_logging)
-    cli_logger = logging.getLogger("PSEDataScraper.CLI")
-    cli_logger.propagate = False
-    
-    if ctx.enable_logging:
-        ch = logging.StreamHandler()
-        ch.setLevel(logging.INFO)
-        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-        ch.setFormatter(formatter)
-        cli_logger.addHandler(ch)
-        cli_logger.setLevel(logging.INFO)
-    else:
-        cli_logger.addHandler(logging.NullHandler())
-        cli_logger.setLevel(logging.CRITICAL)
-
     try:
         scraper = PSEDataScraper(
             max_workers=ctx.max_workers,
             use_proxies=ctx.use_proxies,
             enable_logging=ctx.enable_logging,
+            cli_mode=True  # Enable CLI mode for quiet logging
         )
 
         # Display header
         console.print(Panel.fit(
             "📈 [bold blue]PSE DATA SCRAPER[/bold blue]\n"
-            "Philippine Stock Exchange data scraping tool",
+            f"Philippine Stock Exchange data scraping tool\n"
+            f"⚙️ Configuration: {ctx.max_workers} worker(s), "
+            f"{'proxy enabled' if ctx.use_proxies else 'no proxy'}, "
+            f"{'logging enabled' if ctx.enable_logging else 'logging disabled'}",
             style="blue"
         ))
         
@@ -423,7 +559,7 @@ def _run_interactive_mode(ctx: CLIContext):
                     break
                     
                 elif choice == "6":  # Settings
-                    _interactive_settings(ctx, scraper, cli_logger)
+                    _interactive_settings(ctx, scraper)
                     continue
                 
                 # Handle report selection
@@ -475,22 +611,187 @@ def _run_interactive_mode(ctx: CLIContext):
                                 console.print("[yellow]Operation cancelled[/yellow]")
                                 continue
                         
-                        # Bulk processing with progress
-                        with Progress(console=console) as progress:
-                            task = progress.add_task("Processing companies...", total=company_count)
+                        # Bulk processing with detailed progress
+                        console.print(f"\n[bold green]🚀 BULK PROCESSING: {company_count} companies (ID {start_id} - {end_id})[/bold green]")
+                        
+                        with Progress(
+                            TextColumn("[progress.description]{task.description}"),
+                            BarColumn(),
+                            TaskProgressColumn(),
+                            TimeElapsedColumn(),
+                            console=console
+                        ) as progress:
+                            main_task = progress.add_task("Starting bulk processing...", total=company_count)
+                            detail_task = progress.add_task("", total=None)
                             
                             for i, company_id in enumerate(range(start_id, end_id + 1), 1):
-                                progress.update(task, description=f"Processing company ID {company_id}")
-                                scraper.scrape_data(str(company_id), report_type)
-                                progress.advance(task)
+                                # Update main progress with current company
+                                progress.update(main_task, description=f"Processing company ID {company_id} ({i}/{company_count})")
+                                
+                                # Store data count before processing
+                                initial_count = len(scraper.data)
+                                
+                                # Create progress callback for detailed steps
+                                def progress_callback(step_type: str, message: str):
+                                    step_messages = {
+                                        "initializing": "🚀 Initializing",
+                                        "searching": "🔍 Searching PSE database",
+                                        "parsing": "📄 Parsing results",
+                                        "processing": "📊 Analyzing data",
+                                        "downloading": f"⬇️ Downloading reports" + (f" ({scraper.max_workers} workers)" if scraper.max_workers > 1 else ""),
+                                        "success": "✅ Complete",
+                                        "empty": "⚠️ No data found",
+                                        "error": "❌ Error",
+                                        "warning": "⚠️ Warning"
+                                    }
+                                    icon = step_messages.get(step_type, "⏳")
+                                    progress.update(detail_task, description=f"   {icon} {message}")
+                                
+                                # Process the company with detailed progress
+                                scraper.scrape_data(str(company_id), report_type, progress_callback)
+                                
+                                # Check results
+                                records_found = len(scraper.data) - initial_count
+                                if records_found > 0:
+                                    progress.update(detail_task, description=f"   ✅ ID {company_id}: Found {records_found} record(s)")
+                                else:
+                                    progress.update(detail_task, description=f"   ⚠️ ID {company_id}: No data found")
+                                
+                                progress.advance(main_task)
+                                
+                                # Brief pause to show status
+                                import time
+                                time.sleep(0.2)
                     else:
                         # Single company by ID
-                        console.print(f"Processing company ID: [bold]{start_company}[/bold]")
-                        scraper.scrape_data(start_company, report_type)
+                        console.print(f"\n[bold green]🔍 Processing company ID: {start_company}[/bold green]")
+                        
+                        # Create progress tracking system
+                        current_step = {"step": "", "detail": ""}
+                        
+                        def progress_callback(step_type: str, message: str):
+                            current_step["step"] = step_type
+                            current_step["detail"] = message
+                        
+                        with Progress(
+                            SpinnerColumn(),
+                            TextColumn("[progress.description]{task.description}"),
+                            console=console,
+                            transient=False
+                        ) as progress:
+                            task = progress.add_task("", total=None)
+                            
+                            # Store initial count
+                            initial_count = len(scraper.data)
+                            
+                            # Map progress steps to user-friendly messages
+                            step_messages = {
+                                "initializing": "🚀 Initializing scraper",
+                                "searching": "🔍 Searching PSE database",
+                                "parsing": "📄 Parsing search results", 
+                                "processing": "📊 Analyzing report data",
+                                "downloading": "⬇️ Downloading reports",
+                                "success": "✅ Processing complete",
+                                "empty": "⚠️ No data found",
+                                "error": "❌ Error occurred",
+                                "warning": "⚠️ Warning"
+                            }
+                            
+                            # Create a thread to update progress
+                            import threading
+                            import time
+                            
+                            def update_progress():
+                                while True:
+                                    if current_step["step"] in step_messages:
+                                        icon = step_messages[current_step["step"]]
+                                        detail = current_step["detail"]
+                                        progress.update(task, description=f"{icon} {detail}")
+                                    time.sleep(0.1)
+                                    if current_step["step"] in ["success", "empty", "error"]:
+                                        break
+                            
+                            # Start progress update thread
+                            progress_thread = threading.Thread(target=update_progress, daemon=True)
+                            progress_thread.start()
+                            
+                            # Process the company with detailed progress
+                            scraper.scrape_data(start_company, report_type, progress_callback)
+                            
+                            # Wait for progress thread to finish
+                            progress_thread.join(timeout=1.0)
+                            
+                            # Final status update
+                            records_found = len(scraper.data) - initial_count
+                            if records_found > 0:
+                                progress.update(task, description=f"✅ Complete: Found {records_found} record(s)")
+                            else:
+                                progress.update(task, description=f"⚠️ Complete: No data found")
                 else:
                     # Company symbol
-                    console.print(f"Processing company: [bold]{start_company.upper()}[/bold]")
-                    scraper.scrape_data(start_company.upper(), report_type)
+                    console.print(f"\n[bold green]🔍 Processing company: {start_company.upper()}[/bold green]")
+                    
+                    # Create progress tracking system
+                    current_step = {"step": "", "detail": ""}
+                    
+                    def progress_callback(step_type: str, message: str):
+                        current_step["step"] = step_type
+                        current_step["detail"] = message
+                    
+                    with Progress(
+                        SpinnerColumn(),
+                        TextColumn("[progress.description]{task.description}"),
+                        console=console,
+                        transient=False
+                    ) as progress:
+                        task = progress.add_task("", total=None)
+                        
+                        # Store initial count
+                        initial_count = len(scraper.data)
+                        
+                        # Map progress steps to user-friendly messages
+                        step_messages = {
+                            "initializing": "🚀 Initializing scraper",
+                            "searching": "🔍 Searching PSE database",
+                            "parsing": "📄 Parsing search results", 
+                            "processing": "📊 Analyzing report data",
+                            "downloading": "⬇️ Downloading reports",
+                            "success": "✅ Processing complete",
+                            "empty": "⚠️ No data found",
+                            "error": "❌ Error occurred",
+                            "warning": "⚠️ Warning"
+                        }
+                        
+                        # Create a thread to update progress
+                        import threading
+                        import time
+                        
+                        def update_progress():
+                            while True:
+                                if current_step["step"] in step_messages:
+                                    icon = step_messages[current_step["step"]]
+                                    detail = current_step["detail"]
+                                    progress.update(task, description=f"{icon} {detail}")
+                                time.sleep(0.1)
+                                if current_step["step"] in ["success", "empty", "error"]:
+                                    break
+                        
+                        # Start progress update thread
+                        progress_thread = threading.Thread(target=update_progress, daemon=True)
+                        progress_thread.start()
+                        
+                        # Process the company with detailed progress
+                        scraper.scrape_data(start_company.upper(), report_type, progress_callback)
+                        
+                        # Wait for progress thread to finish
+                        progress_thread.join(timeout=1.0)
+                        
+                        # Final status update
+                        records_found = len(scraper.data) - initial_count
+                        if records_found > 0:
+                            progress.update(task, description=f"✅ Complete: Found {records_found} record(s)")
+                        else:
+                            progress.update(task, description=f"⚠️ Complete: No data found")
 
                 # Save results
                 scraper.save_results(filename, ctx.formats)
@@ -510,7 +811,7 @@ def _run_interactive_mode(ctx: CLIContext):
         console.print(f"[red]A fatal error occurred: {e}[/red]")
 
 
-def _interactive_settings(ctx: CLIContext, scraper: PSEDataScraper, cli_logger):
+def _interactive_settings(ctx: CLIContext, scraper: PSEDataScraper):
     """Handle interactive settings menu."""
     while True:
         console.print("\n[bold cyan]SETTINGS[/bold cyan]")

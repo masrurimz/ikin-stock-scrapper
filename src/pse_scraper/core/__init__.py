@@ -30,6 +30,7 @@ class PSEDataScraper:
         max_workers: int = 5,
         use_proxies: bool = False,
         enable_logging: bool = True,
+        cli_mode: bool = False,
     ):
         """
         Initialize basic configuration and requests session.
@@ -38,6 +39,7 @@ class PSEDataScraper:
             max_workers: Number of workers for concurrent processing
             use_proxies: Flag to use proxy rotation
             enable_logging: Flag to enable/disable logging
+            cli_mode: Flag to enable CLI mode with quiet logging
         """
         self.BASE_URL = "https://edge.pse.com.ph"
         self.FORM_ACTION_URL = f"{self.BASE_URL}/companyDisclosures/search.ax"
@@ -48,7 +50,13 @@ class PSEDataScraper:
         self.stop_iteration = False
 
         # Setup logging first (needed for _load_proxies)
-        self.logger = setup_logging(enable_logging)
+        if cli_mode and enable_logging:
+            # Use quiet logger for CLI mode to avoid interfering with Rich output
+            from ..utils.logging_config import get_quiet_logger
+            self.logger = get_quiet_logger("PSEDataScraper.CLI")
+        else:
+            # Standard logging for non-CLI usage
+            self.logger = setup_logging(enable_logging)
         
         # Setup HTTP client
         proxies = self._load_proxies() if use_proxies else []
@@ -143,18 +151,22 @@ class PSEDataScraper:
 
         return grid
 
-    def scrape_data(self, company_id: str, report_type: ReportType) -> List[Dict]:
+    def scrape_data(self, company_id: str, report_type: ReportType, progress_callback=None) -> List[Dict]:
         """
         Scrape data from PSE Edge with concurrent processing.
 
         Args:
             company_id: Company ID
             report_type: Report type
+            progress_callback: Optional callback function for progress updates
             
         Returns:
             List of dictionaries containing scraped data
         """
         try:
+            if progress_callback:
+                progress_callback("initializing", f"Starting scraper for {company_id}")
+                
             self.logger.info(
                 f"Starting data scraping for company_id: {company_id}, report_type: {report_type.value}"
             )
@@ -167,20 +179,39 @@ class PSEDataScraper:
                 "dateSortType": "DESC",
             }
 
+            if progress_callback:
+                progress_callback("searching", f"Searching PSE database for {company_id}")
+
             response = self.http_client.make_request(self.FORM_ACTION_URL, "post", data=payload)
             if not response:
                 self.logger.error(f"Failed to get initial data for company_id: {company_id}")
+                if progress_callback:
+                    progress_callback("error", f"Failed to connect to PSE database")
                 return []
+
+            if progress_callback:
+                progress_callback("parsing", "Parsing search results")
 
             soup = self._get_soup(response)
             if not soup:
+                if progress_callback:
+                    progress_callback("error", "Failed to parse search results")
                 return []
 
             pages_count = self._get_pages_count(soup)
             if not pages_count:
+                if progress_callback:
+                    progress_callback("empty", "No reports found")
                 return []
 
             self.logger.info(f"Found {pages_count} pages to process")
+            
+            if progress_callback:
+                progress_callback("processing", f"Found {pages_count} page(s) of results")
+
+            if progress_callback:
+                worker_info = f"using {self.max_workers} worker(s)" if self.max_workers > 1 else "single-threaded"
+                progress_callback("downloading", f"Starting parallel processing {worker_info}")
 
             with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
                 futures = []
@@ -190,15 +221,34 @@ class PSEDataScraper:
                         executor.submit(self._process_page, payload.copy(), report_type)
                     )
 
+                completed_pages = 0
+                total_pages = len(futures)
                 for future in as_completed(futures):
                     try:
                         future.result()
+                        completed_pages += 1
+                        if progress_callback:
+                            if self.max_workers > 1:
+                                progress_callback("downloading", f"Pages completed: {completed_pages}/{total_pages} (concurrent processing)")
+                            else:
+                                progress_callback("downloading", f"Processing page {completed_pages}/{total_pages}")
                     except Exception as e:
                         self.logger.error(f"Error in concurrent processing: {e}")
+                        if progress_callback:
+                            progress_callback("warning", f"Error processing page: {str(e)[:50]}...")
+                            
+            if progress_callback:
+                records_found = len(self.data)
+                if records_found > 0:
+                    progress_callback("success", f"Found {records_found} record(s)")
+                else:
+                    progress_callback("empty", "No data found in reports")
                         
             return self.data
         except Exception as e:
             self.logger.error(f"Error in scrape_data: {e}")
+            if progress_callback:
+                progress_callback("error", f"Scraping failed: {str(e)[:50]}...")
             return []
 
     def _get_pages_count(self, soup: BeautifulSoup) -> int:
