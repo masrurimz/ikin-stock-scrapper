@@ -12,6 +12,16 @@ import subprocess
 from pathlib import Path
 import argparse
 
+# Configure UTF-8 encoding for Windows
+if platform.system().lower() == "windows":
+    import locale
+    # Set environment variables for UTF-8 support
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    # Reconfigure stdout/stderr for UTF-8
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8')
+        sys.stderr.reconfigure(encoding='utf-8')
+
 
 def get_platform_info():
     """Get current platform information."""

@@ -66,6 +66,14 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set UTF-8 encoding (Windows)
+        if: steps.should-run.outputs.run == 'true' && runner.os == 'Windows'
+        run: |
+          echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
+          echo "PYTHONUTF8=1" >> $env:GITHUB_ENV
+          chcp 65001
+        shell: pwsh
+
       - name: Install Poetry
         if: steps.should-run.outputs.run == 'true'
         uses: snok/install-poetry@v1
