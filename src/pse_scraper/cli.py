@@ -15,7 +15,7 @@ def interactive_menu():
     settings = {
         "enable_logging": True,
         "use_proxies": False,
-        "max_workers": 1,
+        "max_workers": 5,
         "default_save_format": ["csv"],
     }
 
