@@ -11,6 +11,7 @@ This version represents a complete rewrite and restructuring of the PSE Data Scr
 ### ✨ Added
 
 #### **New Architecture**
+
 - **Modular Package Structure** - Clean separation of concerns with dedicated modules
 - **Core Scraper Engine** - `PSEDataScraper` class with robust error handling and logging
 - **Specialized Processors** - Individual processors for each report type:
@@ -23,6 +24,7 @@ This version represents a complete rewrite and restructuring of the PSE Data Scr
 - **Data Models** - Enum-based report type definitions
 
 #### **Command Line Interface**
+
 - **Modern CLI** - `cli.py` with argparse-based interface
 - **Intuitive Commands** - Human-readable report type names
 - **Flexible Output** - Support for JSON and CSV formats
@@ -30,6 +32,7 @@ This version represents a complete rewrite and restructuring of the PSE Data Scr
 - **Comprehensive Help** - Built-in examples and documentation
 
 #### **Examples and Documentation**
+
 - **Usage Examples** - `examples/` directory with practical examples:
   - `basic_usage.py` - Simple scraping examples
   - `advanced_usage.py` - Advanced configuration options  
@@ -38,11 +41,13 @@ This version represents a complete rewrite and restructuring of the PSE Data Scr
 - **Setup Guide** - `SETUP.md` with installation and configuration instructions
 
 #### **Testing Framework**
+
 - **Test Suite** - `tests/` directory with unit tests
 - **Test Configuration** - `conftest.py` with shared fixtures
 - **Coverage Support** - Ready for test coverage analysis
 
 #### **Development Tools**
+
 - **Poetry Integration** - Modern dependency management
 - **Code Quality Tools** - Black, Flake8, MyPy integration
 - **Type Hints** - Full type annotation support
@@ -51,18 +56,21 @@ This version represents a complete rewrite and restructuring of the PSE Data Scr
 ### 🔧 Enhanced Features
 
 #### **Performance Improvements**
+
 - **Concurrent Processing** - Configurable thread pool for parallel requests
 - **HTTP Client Optimization** - Retry logic, timeout handling, session management
 - **Proxy Support** - Built-in proxy rotation capabilities
 - **Memory Efficiency** - Optimized data structures and processing
 
 #### **Error Handling & Logging**
+
 - **Comprehensive Logging** - Structured logging with multiple levels
 - **Graceful Error Recovery** - Robust exception handling
 - **Progress Tracking** - Real-time scraping progress indicators
 - **Debug Support** - Detailed debug information for troubleshooting
 
 #### **Data Processing**
+
 - **Smart Type Conversion** - Automatic numeric value conversion
 - **Text Cleaning** - Enhanced text processing utilities
 - **Data Validation** - Input validation and sanitization
@@ -96,11 +104,13 @@ pse-scraper/
 #### **From v1.x to v2.0**
 
 **Old Usage:**
+
 ```bash
 python batchFile.py
 ```
 
 **New Usage:**
+
 ```bash
 # CLI
 python cli.py <COMPANY> <REPORT_TYPE> --output <FILENAME>
@@ -115,11 +125,13 @@ scraper.save_results("output", ["json", "csv"])
 ### 🛠️ Dependencies
 
 #### **Core Dependencies**
+
 - `requests ^2.31.0` - HTTP library
 - `beautifulsoup4 ^4.12.0` - HTML parsing
 - `html5lib ^1.1` - HTML5 parser
 
 #### **Development Dependencies**  
+
 - `pytest ^7.4.0` - Testing framework
 - `black ^23.0.0` - Code formatter
 - `flake8 ^6.0.0` - Linter
@@ -158,6 +170,7 @@ scraper.save_results("output", ["json", "csv"])
 ## [1.x] - Previous Versions
 
 ### Legacy Features (Deprecated in 2.0)
+
 - Monolithic `batchFile.py` script
 - Manual dependency management
 - Windows batch file interface (`run_batchFile.bat`)

@@ -19,19 +19,24 @@ def interactive_menu():
         "default_save_format": ["csv"],
     }
 
-    # Setup basic logging
+    # Setup logging using the same system as PSEDataScraper
+    from .utils.logging_config import setup_logging
+    logger = setup_logging(settings["enable_logging"])
+    
+    # Also get a CLI-specific logger that shares the same handlers but doesn't duplicate
+    cli_logger = logging.getLogger("PSEDataScraper.CLI")
+    cli_logger.propagate = False  # Prevent duplicate messages
     if settings["enable_logging"]:
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-        )
-        logger = logging.getLogger("main")
+        # Add console handler to CLI logger to show CLI-specific messages
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+        ch.setFormatter(formatter)
+        cli_logger.addHandler(ch)
+        cli_logger.setLevel(logging.INFO)
     else:
-        logging.basicConfig(level=logging.CRITICAL)
-        logger = logging.getLogger("null")
-        logger.setLevel(logging.CRITICAL)
-        logger.propagate = False
-        logger.addHandler(logging.NullHandler())
+        cli_logger.addHandler(logging.NullHandler())
+        cli_logger.setLevel(logging.CRITICAL)
 
     try:
         scraper = PSEDataScraper(
@@ -50,14 +55,20 @@ def interactive_menu():
         }
 
         # Display program header
-        print("\nProgram Scraping Data PSE (Philippine Stock Exchange)")
-        print("Program ini digunakan untuk mengambil data keuangan dari platform PSE Edge.")
-        print("\nFitur:")
-        print("1. Public Ownership Report")
-        print("2. Quarterly Report")
-        print("3. Annual Report")
-        print("4. List of Top 100 Stockholders")
-        print("5. Declaration of Cash Dividends")
+        print("\n" + "="*60)
+        print("📈 PSE DATA SCRAPER - Philippine Stock Exchange")
+        print("="*60)
+        print("Scrape financial data from PSE Edge platform")
+        print("\n🔍 SEARCH OPTIONS:")
+        print("  • Company Symbol: SM, BDO, PLDT, etc.")  
+        print("  • Single Company ID: Any number (1, 2, 3, etc.)")
+        print("  • 🚀 BULK PROCESSING: Range of IDs (e.g., 1-100)")
+        print("\n📊 AVAILABLE REPORTS:")
+        print("  1. Public Ownership Report")
+        print("  2. Quarterly Report")
+        print("  3. Annual Report")
+        print("  4. List of Top 100 Stockholders")
+        print("  5. Declaration of Cash Dividends")
 
         # Main menu loop
         while True:
@@ -76,7 +87,7 @@ def interactive_menu():
 
                 if choice == 7:  # Exit
                     if settings["enable_logging"]:
-                        logger.info("Program finished")
+                        cli_logger.info("Program finished")
                     break
 
                 elif choice == 6:  # Settings
@@ -93,23 +104,31 @@ def interactive_menu():
 
                         if setting_choice == "1":
                             settings["enable_logging"] = not settings["enable_logging"]
-                            if not settings["enable_logging"]:
-                                for handler in logging.root.handlers[:]:
-                                    logging.root.removeHandler(handler)
-                                logging.basicConfig(level=logging.CRITICAL)
-                            else:
-                                for handler in logging.root.handlers[:]:
-                                    logging.root.removeHandler(handler)
-                                logging.basicConfig(
-                                    level=logging.INFO,
-                                    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-                                )
                             
+                            # Reinitialize scraper with new logging setting
                             scraper = PSEDataScraper(
                                 max_workers=settings["max_workers"],
                                 use_proxies=settings["use_proxies"],
                                 enable_logging=settings["enable_logging"],
                             )
+                            
+                            # Update the logger for CLI too
+                            logger = setup_logging(settings["enable_logging"])
+                            
+                            # Reconfigure CLI logger
+                            cli_logger.handlers.clear()
+                            cli_logger.propagate = False
+                            if settings["enable_logging"]:
+                                ch = logging.StreamHandler()
+                                ch.setLevel(logging.INFO)
+                                formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+                                ch.setFormatter(formatter)
+                                cli_logger.addHandler(ch)
+                                cli_logger.setLevel(logging.INFO)
+                            else:
+                                cli_logger.addHandler(logging.NullHandler())
+                                cli_logger.setLevel(logging.CRITICAL)
+                            
                             print(f"Logging {'enabled' if settings['enable_logging'] else 'disabled'}")
 
                         elif setting_choice == "2":
@@ -164,42 +183,115 @@ def interactive_menu():
                 scraper.data = []
                 scraper.stop_iteration = False
                 if settings["enable_logging"]:
-                    logger.info("Starting new search")
+                    cli_logger.info("Starting new search")
 
                 report_type = report_type_mapping[choice]
                 filename = input("Enter output filename: ")
-                start_iteration = int(input("Enter start iteration: "))
-                end_iteration = input("Enter end iteration (leave empty for single iteration): ")
-
-                if end_iteration:
-                    for i in range(start_iteration, int(end_iteration) + 1):
+                
+                print("\nCompany Selection Options:")
+                print("1. Single company by symbol: Enter company symbol (e.g., 'SM', 'BDO', 'PLDT')")
+                print("2. Single company by ID: Enter one company ID (e.g., '5')")
+                print("3. Bulk processing: Enter company ID range (e.g., start=1, end=100)")
+                print("   • Company IDs are sequential numbers in PSE database")
+                print("   • Use bulk processing to scrape multiple companies at once")
+                
+                start_company = input("\nEnter company symbol OR starting company ID: ").strip()
+                
+                if not start_company:
+                    print("Error: Company symbol/ID cannot be empty.")
+                    continue
+                
+                # Check if it's a numeric ID (could be single or start of range)
+                if start_company.isdigit():
+                    end_company = input("Enter ending company ID for bulk processing (or press Enter for single company): ").strip()
+                    
+                    if end_company and end_company.isdigit():
+                        # Bulk processing mode
+                        start_id = int(start_company)
+                        end_id = int(end_company)
+                        
+                        if end_id < start_id:
+                            print("Error: Ending company ID must be greater than or equal to starting ID.")
+                            continue
+                        
+                        company_count = end_id - start_id + 1
+                        print(f"\n🔄 BULK PROCESSING MODE")
+                        print(f"   Range: Company ID {start_id} to {end_id}")
+                        print(f"   Total companies: {company_count}")
+                        
+                        # Ask for confirmation for large ranges
+                        if company_count > 50:
+                            print(f"\n⚠️  Large bulk operation detected!")
+                            confirm = input(f"   Process {company_count} companies? This may take a while. (y/N): ").strip().lower()
+                            if confirm != 'y' and confirm != 'yes':
+                                print("Operation cancelled.")
+                                continue
+                        elif company_count > 10:
+                            confirm = input(f"   Process {company_count} companies? (Y/n): ").strip().lower()
+                            if confirm == 'n' or confirm == 'no':
+                                print("Operation cancelled.")
+                                continue
+                        
+                        print(f"\n🚀 Starting bulk processing...")
+                        for i, company_id in enumerate(range(start_id, end_id + 1), 1):
+                            print(f"   [{i:3d}/{company_count:3d}] Processing company ID {company_id}...")
+                            if settings["enable_logging"]:
+                                cli_logger.info(f"Processing company ID {company_id} ({i}/{company_count})")
+                            scraper.scrape_data(str(company_id), report_type)
+                    else:
+                        # Single company by ID
+                        print(f"\n📋 SINGLE COMPANY MODE")
+                        print(f"   Processing company ID: {start_company}")
                         if settings["enable_logging"]:
-                            logger.info(f"Processing iteration {i}")
-                        scraper.scrape_data(str(i), report_type)
+                            cli_logger.info(f"Processing single company ID {start_company}")
+                        scraper.scrape_data(start_company, report_type)
                 else:
-                    scraper.scrape_data(str(start_iteration), report_type)
+                    # Company symbol provided
+                    print(f"\n📊 COMPANY SYMBOL MODE")
+                    print(f"   Processing company: {start_company.upper()}")
+                    if settings["enable_logging"]:
+                        cli_logger.info(f"Processing company symbol {start_company}")
+                    scraper.scrape_data(start_company.upper(), report_type)
 
                 # Save results with default format
                 scraper.save_results(filename, settings["default_save_format"])
+                
+                # Show completion summary
+                print(f"\n✅ PROCESSING COMPLETED!")
+                print(f"   📊 Records found: {len(scraper.data)}")
+                print(f"   💾 Saved to: {filename}.{'/'.join(settings['default_save_format'])}")
+                
+                if len(scraper.data) == 0:
+                    print(f"\n⚠️  NO DATA FOUND")
+                    print(f"   This could mean:")
+                    print(f"   • The company ID/symbol doesn't exist")
+                    print(f"   • No reports of this type are available")
+                    print(f"   • The company hasn't filed recent reports")
+                else:
+                    print(f"   🎉 Success! Found data for {len(scraper.data)} entries")
 
             except ValueError as e:
                 if settings["enable_logging"]:
-                    logger.error(f"Input error: {e}")
-                print("Invalid input. Please enter a number.")
+                    cli_logger.error(f"Input error: {e}")
+                print("Invalid input. Please enter a valid number for menu choice.")
+
+            except KeyboardInterrupt:
+                print("\nOperation cancelled by user.")
+                continue
 
             except Exception as e:
                 if settings["enable_logging"]:
-                    logger.error(f"Unexpected error: {e}")
+                    cli_logger.error(f"Unexpected error: {e}")
                 print(f"An error occurred: {e}")
 
     except KeyboardInterrupt:
         if settings["enable_logging"]:
-            logger.info("Program stopped by user")
+            cli_logger.info("Program stopped by user")
         print("\nProgram stopped")
 
     except Exception as e:
         if settings["enable_logging"]:
-            logger.error(f"Fatal error: {e}")
+            cli_logger.error(f"Fatal error: {e}")
         print(f"A fatal error occurred: {e}")
 
 
@@ -212,18 +304,24 @@ def command_line_mode():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
+  # Using company symbols:
   pse-scraper SM public_ownership --output sm_ownership
   pse-scraper BDO annual_report --output bdo_annual --formats json csv
   pse-scraper PLDT quarterly_report --workers 3 --use-proxies
-  pse-scraper JFC cash_dividends --output jfc_dividends --formats json
-  pse-scraper ALI stockholders --output ali_stockholders
+  
+  # Using numeric company IDs (for bulk processing):
+  pse-scraper 1 cash_dividends --output company_1_dividends
+  pse-scraper 15 stockholders --output company_15_stockholders
+  
+  # Interactive mode (recommended for bulk processing):
+  pse-scraper --interactive
         """
     )
     
     parser.add_argument(
         "company_id",
         nargs="?",
-        help="Company ID/Stock Symbol (e.g., SM, BDO, PLDT). If not provided, interactive mode starts."
+        help="Company ID/Stock Symbol (e.g., 'SM', 'BDO', 'PLDT') or numeric company ID (e.g., 1, 2, 3). If not provided, interactive mode starts."
     )
     
     parser.add_argument(
