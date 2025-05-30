@@ -53,9 +53,37 @@ poetry shell
 
 ## 📖 Usage
 
-### Command Line Interface
+PSE Data Scraper offers two modes of operation:
 
-The new CLI provides a clean interface for scraping data:
+### 🖥️ Interactive Menu Mode (Default)
+
+When run without arguments, the scraper starts an interactive menu matching the original interface:
+
+```bash
+# Start interactive mode
+pse-scraper
+# or explicitly
+pse-scraper --interactive
+```
+
+The interactive menu provides:
+- **Main Menu**: Choose from 5 report types
+- **Settings**: Configure logging, proxy, workers, and output formats
+- **Iteration Support**: Single or batch processing with iteration ranges
+- **Real-time Configuration**: Adjust settings without restarting
+
+**Interactive Menu Features:**
+1. **Public Ownership Report** - Company ownership structure
+2. **Quarterly Report** - Financial statements 
+3. **Annual Report** - Annual financial data
+4. **List of Top 100 Stockholders** - Major shareholders
+5. **Declaration of Cash Dividends** - Dividend announcements
+6. **Settings** - Configure scraper behavior
+7. **Exit** - Close the application
+
+### ⚡ Command Line Mode
+
+For automation and scripting, use direct command line arguments:
 
 ```bash
 # Basic usage
