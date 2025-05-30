@@ -4,10 +4,22 @@ version = "0.1.0"
 description = "A scrapper to gather data about cash dividen, top 100 stockholder, annual report, querterly report, public ownership report from edge.pse.com.ph"
 authors = ["Muhammad Zahid Masruri <masruri03@gmail.com>"]
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
+requests = "^2.31.0"
+beautifulsoup4 = "^4.12.0"
+html5lib = "^1.1"
 
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.4.0"
+black = "^23.0.0"
+flake8 = "^6.0.0"
+mypy = "^1.5.0"
+
+[tool.poetry.scripts]
+pse-scraper = "batchFile:main"
 
 [build-system]
 requires = ["poetry-core"]
