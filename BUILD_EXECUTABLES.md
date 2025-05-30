@@ -181,6 +181,41 @@ Modify `build_executable.py` to:
    poetry run pyinstaller --onefile src/pse_scraper/cli.py
    ```
 
+## GitHub Actions Troubleshooting
+
+### Workflow Updates (May 2025)
+
+The GitHub Actions workflow has been updated to use the latest action versions:
+
+- **actions/setup-python@v5** (was v4)
+- **actions/cache@v4** (was v3)  
+- **actions/upload-artifact@v4** (was v3)
+- **actions/download-artifact@v4** (was v3)
+
+### Testing Workflows
+
+Use the test workflow to verify builds without creating releases:
+
+1. Go to GitHub Actions tab
+2. Select "Test Build Workflow"
+3. Click "Run workflow"
+4. Choose a specific platform or leave empty for all platforms
+5. Monitor the build process and download test artifacts
+
+### Common Workflow Issues
+
+1. **Missing download info for actions/upload-artifact@v3**
+   - **Solution**: Updated to v4 in the workflow
+   - **Cause**: GitHub deprecated v3 actions
+
+2. **Python version compatibility**
+   - **Solution**: Updated to support Python 3.10-3.13
+   - **Workflow uses**: Python 3.11 for broader compatibility
+
+3. **Artifact upload failures**
+   - **Solution**: Added verification steps before upload
+   - **Debugging**: Check the "Verify executable exists" step
+
 ## Size Optimization
 
 The built executables are optimized for size:

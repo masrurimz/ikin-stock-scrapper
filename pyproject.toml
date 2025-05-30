@@ -33,7 +33,7 @@ classifiers = [
 packages = [{ include = "pse_scraper", from = "src" }]
 
 [tool.poetry.dependencies]
-python = ">=3.10,<3.13"
+python = ">=3.10,<3.14"
 requests = "^2.31.0"
 beautifulsoup4 = "^4.12.0"
 html5lib = "^1.1"
