@@ -1,10 +1,28 @@
 [tool.poetry]
-name = "ikin-stock-scrapper"
-version = "0.1.0"
-description = "A scrapper to gather data about cash dividen, top 100 stockholder, annual report, querterly report, public ownership report from edge.pse.com.ph"
+name = "pse-scraper"
+version = "2.0.0"
+description = "A modern, modular scraper to gather data about cash dividends, top 100 stockholders, annual reports, quarterly reports, and public ownership reports from edge.pse.com.ph"
 authors = ["Muhammad Zahid Masruri <masruri03@gmail.com>"]
+license = "MIT"
 readme = "README.md"
-package-mode = false
+homepage = "https://github.com/masrurimz/pse-scraper"
+repository = "https://github.com/masrurimz/pse-scraper"
+keywords = ["pse", "scraper", "philippines", "stock", "exchange", "financial", "data"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Financial and Insurance Industry",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Office/Business :: Financial",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Internet :: WWW/HTTP :: Dynamic Content"
+]
+packages = [{ include = "pse_scraper", from = "src" }]
 
 [tool.poetry.dependencies]
 python = "^3.10"
@@ -17,9 +35,11 @@ pytest = "^7.4.0"
 black = "^23.0.0"
 flake8 = "^6.0.0"
 mypy = "^1.5.0"
+pytest-cov = "^6.1.1"
+pytest-mock = "^3.14.1"
 
 [tool.poetry.scripts]
-pse-scraper = "batchFile:main"
+pse-scraper = "pse_scraper.cli:main"
 
 [build-system]
 requires = ["poetry-core"]
