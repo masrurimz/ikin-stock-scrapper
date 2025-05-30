@@ -10,6 +10,17 @@ on:
         description: "Version tag"
         required: false
         default: "latest"
+      platform:
+        description: "Platform to build (leave empty for all)"
+        required: false
+        default: ""
+        type: choice
+        options:
+          - ""
+          - "ubuntu-latest"
+          - "windows-latest"
+          - "macos-latest"
+          - "macos-14"
 
 jobs:
   build:
@@ -33,6 +44,9 @@ jobs:
       run:
         shell: bash
     runs-on: ${{ matrix.os }}
+
+    # Skip builds if a specific platform is requested and this isn't it
+    if: ${{ github.event.inputs.platform == '' || matrix.os == github.event.inputs.platform }}
 
     steps:
       - name: Checkout code
