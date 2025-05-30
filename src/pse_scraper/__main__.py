@@ -6,7 +6,37 @@ This handles the import paths correctly for both development and packaged versio
 
 import sys
 import os
+import platform
 from pathlib import Path
+
+# Setup UTF-8 encoding for Windows as early as possible
+def _setup_utf8_encoding():
+    """Setup UTF-8 encoding for cross-platform support."""
+    if platform.system() == "Windows":
+        try:
+            # Set environment variables
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            os.environ['PYTHONUTF8'] = '1'
+            
+            # Try to set console code page to UTF-8
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            kernel32.SetConsoleOutputCP(65001)  # UTF-8 code page
+            kernel32.SetConsoleCP(65001)        # UTF-8 input code page
+            
+            # Reconfigure stdout/stderr if possible
+            if hasattr(sys.stdout, 'reconfigure'):
+                sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+            if hasattr(sys.stderr, 'reconfigure'):
+                sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+                
+        except Exception:
+            # Fallback: just ensure environment variables are set
+            os.environ['PYTHONIOENCODING'] = 'utf-8'
+            os.environ['PYTHONUTF8'] = '1'
+
+# Setup UTF-8 before any other imports
+_setup_utf8_encoding()
 
 # Add the src directory to the path for proper imports
 if getattr(sys, 'frozen', False):
