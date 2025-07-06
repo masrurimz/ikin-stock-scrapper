@@ -49,12 +49,23 @@ Currently, the PSE Data Scraper supports 5 report types (Public Ownership, Quart
 
 ### Data Requirements
 
-Based on sample analysis, extract the following fields:
+**NOTE: Critical Issue Identified** - The reference output format image shows "Public Ownership" data, not share buyback format.
 
-- **Basic Info**: stock_name, disclosure_date
-- **Date Components**: Date Registered, Month, Year, Day
-- **Transaction Data**: value_1, value_2, value_3, value_4 (numeric values)
-- **Metadata**: Default value of 1 (constant field)
+**Confirmed Fields:**
+
+- **Basic Info**: "stock name", "disclosure date" (following existing processor pattern)
+- **Additional Fields**: TBD - requires analysis of actual share buyback document structure
+
+**Expected Output Structure:**
+
+```json
+{
+    "stock name": "ALI",           // From companyStockSymbol span
+    "disclosure date": "5/27/2025", // From search results
+    // Additional buyback-specific fields to be determined
+    // from actual document structure analysis
+}
+```
 
 ### Functional Specifications
 
@@ -148,6 +159,7 @@ Based on sample analysis, extract the following fields:
 ### Technical Risks
 
 1. **Risk**: Unknown HTML structure for share buyback reports
+
    - **Mitigation**: Analyze sample URLs before implementation
    - **Contingency**: Create flexible parser that adapts to structure variations
 

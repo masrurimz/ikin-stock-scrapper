@@ -52,9 +52,13 @@ class ReportType(Enum):
 class ShareBuybackProcessor:
     def __init__(self, logger)
     def process(self, soup: BeautifulSoup, stock_name: str, disclosure_date: str) -> Optional[Dict]
+        # soup: iframe content (BeautifulSoup object)
+        # stock_name: extracted from <span id="companyStockSymbol">
+        # disclosure_date: from search results
+        # Returns: {"stock name": stock_name, "disclosure date": disclosure_date, ...extracted_fields}
     def _extract_share_buyback_data(self, soup: BeautifulSoup, stock_name: str, report_date: str) -> Dict
-    def _parse_date_components(self, date_text: str) -> Optional[Dict]
-    def _extract_transaction_values(self, soup: BeautifulSoup) -> Dict
+    def _extract_transaction_tables(self, soup: BeautifulSoup) -> Dict
+    def _extract_form_fields(self, soup: BeautifulSoup) -> Dict
 ```
 
 #### Business Logic Layer: Core Scraper Integration
@@ -96,7 +100,7 @@ report_type_map = {
 ### Input Data Contract
 ```typescript
 interface ShareBuybackRequest {
-    company: string;           // Company symbol or ID
+    company: string;           // Company symbol or ID (e.g., "ALI" or "180")
     report_type: "share_buyback";
     output?: string;          // Output filename
     formats?: string[];       // ["csv", "json"]
@@ -104,20 +108,26 @@ interface ShareBuybackRequest {
 }
 ```
 
+### PSE Edge Search Payload
+```typescript
+interface PSESearchPayload {
+    keyword: string;          // Company ID
+    tmplNm: string;          // "Share Buy-Back Transactions"
+    sortType: "date";        // Fixed value
+    dateSortType: "DESC";    // Fixed value  
+    pageNo?: number;         // For pagination
+}
+```
+
 ### Output Data Contract
 ```typescript
 interface ShareBuybackData {
-    stock_name: string;           // "ALI"
-    disclosure_date: string;      // "5/27/2025"
-    "Date Registered": string;    // "5/27/2025"
-    Month: number;               // 5
-    Year: number;                // 2025
-    Day: number;                 // 27
-    "Default value of 1": number; // 1 (constant)
-    value_1: number;             // 5800000
-    value_2: number;             // 26070000000
-    value_3: number;             // 843277246
-    value_4: number;             // 22110774348
+    "stock name": string;        // "ALI" (from companyStockSymbol span)
+    "disclosure date": string;   // Disclosure date from search results
+    // Additional fields extracted from iframe document:
+    // NOTE: Actual field structure needs verification from real share buyback documents
+    // The reference image shows Public Ownership format, not share buyback format
+    [field: string]: any;       // Dynamic fields based on actual document structure
 }
 ```
 
@@ -179,19 +189,20 @@ def process(
 ### PSE Edge Integration Points
 
 #### Search Phase
-- **URL**: `https://edge.pse.com.ph/companyDisclosures/search.ax`
-- **Parameters**: Company ID, template name matching "Share Buy-Back Transactions"
-- **Response**: HTML with search results containing edge_no links
+- **Method**: POST to `https://edge.pse.com.ph/companyDisclosures/search.ax`
+- **Payload**: `{keyword: company_id, tmplNm: "Share Buy-Back Transactions", sortType: "date", dateSortType: "DESC", pageNo: 1}`
+- **Response**: HTML with search results table containing clickable links with edge_no in onclick handlers
 
-#### Document Retrieval Phase
-- **URL**: `https://edge.pse.com.ph/openDiscViewer.do?edge_no={edge_no}`
-- **Response**: HTML page with iframe containing actual document
-- **Iframe Source**: Additional request to extract document content
+#### Document Retrieval Phase  
+- **Method**: GET `https://edge.pse.com.ph/openDiscViewer.do?edge_no={extracted_edge_no}`
+- **Response**: HTML page containing iframe element
+- **Iframe Processing**: Extract iframe src attribute and make additional request
 
 #### Data Extraction Phase
-- **Target**: HTML table/form data within iframe
-- **Challenges**: Unknown exact structure - requires analysis
-- **Strategy**: Flexible parsing with fallback mechanisms
+- **Stock Name**: Extract from `<span id="companyStockSymbol">` in iframe content
+- **Document Data**: Parse HTML tables, forms, or structured content within iframe
+- **Field Mapping**: TBD - requires analysis of actual share buyback document structure
+- **Data Structure**: Follow existing processor pattern with `{"stock name": str, "disclosure date": str, ...}`
 
 ### Existing System Integration
 
