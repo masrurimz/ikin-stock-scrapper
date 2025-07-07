@@ -13,3 +13,4 @@ class ReportType(Enum):
     ANNUAL = "Annual Report"
     TOP_100_STOCKHOLDERS = "List of Top 100 Stockholders"
     CASH_DIVIDENDS = "Declaration of Cash Dividends"
+    SHARE_BUYBACK = "Share Buy-Back Transactions"

@@ -50,15 +50,34 @@ class ReportType(Enum):
 #### Data Access Layer: ShareBuybackProcessor
 ```python
 class ShareBuybackProcessor:
-    def __init__(self, logger)
-    def process(self, soup: BeautifulSoup, stock_name: str, disclosure_date: str) -> Optional[Dict]
+    def __init__(self, logger):
+        self.logger = logger
+    
+    def process(self, soup: BeautifulSoup, stock_name: str, disclosure_date: str) -> Optional[Dict]:
+        """
+        Process share buyback transaction document.
+        
+        Args:
+            soup: BeautifulSoup object of the iframe document
+            stock_name: Stock name/symbol (e.g., "ALI")
+            disclosure_date: Disclosure date from search results
+            
+        Returns:
+            Dictionary containing processed share buyback data or None if no data found
+        """
         # soup: iframe content (BeautifulSoup object)
         # stock_name: extracted from <span id="companyStockSymbol">
         # disclosure_date: from search results
         # Returns: {"stock name": stock_name, "disclosure date": disclosure_date, ...extracted_fields}
-    def _extract_share_buyback_data(self, soup: BeautifulSoup, stock_name: str, report_date: str) -> Dict
-    def _extract_transaction_tables(self, soup: BeautifulSoup) -> Dict
-    def _extract_form_fields(self, soup: BeautifulSoup) -> Dict
+        
+    def _extract_share_buyback_data(self, soup: BeautifulSoup, stock_name: str, report_date: str) -> Dict:
+        """Extract data from share buyback document following existing processor patterns."""
+        
+    def _extract_transaction_tables(self, soup: BeautifulSoup) -> Dict:
+        """Extract tabular data from share buyback tables."""
+        
+    def _extract_form_fields(self, soup: BeautifulSoup) -> Dict:
+        """Extract form field data from share buyback forms."""
 ```
 
 #### Business Logic Layer: Core Scraper Integration
@@ -188,21 +207,42 @@ def process(
 
 ### PSE Edge Integration Points
 
-#### Search Phase
+#### Search Phase ✅ (Verified)
 - **Method**: POST to `https://edge.pse.com.ph/companyDisclosures/search.ax`
 - **Payload**: `{keyword: company_id, tmplNm: "Share Buy-Back Transactions", sortType: "date", dateSortType: "DESC", pageNo: 1}`
 - **Response**: HTML with search results table containing clickable links with edge_no in onclick handlers
+- **Confirmed Template**: "Share Buy-Back Transactions" (exact match found in live data)
+- **Confirmed PSE Form**: "9-1" (consistent across all share buyback entries)
 
-#### Document Retrieval Phase  
+#### Document Retrieval Phase ✅ (Verified)
 - **Method**: GET `https://edge.pse.com.ph/openDiscViewer.do?edge_no={extracted_edge_no}`
 - **Response**: HTML page containing iframe element
 - **Iframe Processing**: Extract iframe src attribute and make additional request
+- **Confirmed Flow**: Same as existing processors (matches core implementation)
 
-#### Data Extraction Phase
+#### Data Extraction Phase ⚠️ (Needs Implementation)
 - **Stock Name**: Extract from `<span id="companyStockSymbol">` in iframe content
 - **Document Data**: Parse HTML tables, forms, or structured content within iframe
-- **Field Mapping**: TBD - requires analysis of actual share buyback document structure
+- **Field Mapping**: **REQUIRES ACTUAL DOCUMENT ANALYSIS** - Cannot access iframe content directly
 - **Data Structure**: Follow existing processor pattern with `{"stock name": str, "disclosure date": str, ...}`
+
+#### Technical Findings from Live PSE Edge Data
+```html
+<!-- Sample search result row -->
+<tr>
+  <td><a href="#viewer" onclick="openPopup('06f23f9fa8cd469fec6e1601ccee8f59');return false;">Share Buy-Back Transactions</a></td>
+  <td class="alignC">Jul 04, 2025 08:08 AM</td>
+  <td class="alignC">9-1</td>
+  <td class="alignC">C04793-2025</td>
+</tr>
+```
+
+**Document Processing Pattern:**
+1. Extract `edge_no` from onclick handler: `06f23f9fa8cd469fec6e1601ccee8f59`
+2. Request: `https://edge.pse.com.ph/openDiscViewer.do?edge_no=06f23f9fa8cd469fec6e1601ccee8f59`
+3. Parse iframe src from response
+4. Fetch iframe content and parse with BeautifulSoup
+5. Extract data using table parsing (similar to cash_dividends.py pattern)
 
 ### Existing System Integration
 

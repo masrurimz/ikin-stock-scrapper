@@ -319,6 +319,8 @@ class PSEDataScraper:
             self._process_single_row(rows, report_type)
         elif report_type == ReportType.ANNUAL:
             self._process_single_row(rows, report_type)
+        elif report_type == ReportType.SHARE_BUYBACK:
+            self._process_single_row(rows, report_type)
         elif report_type == ReportType.TOP_100_STOCKHOLDERS:
             self._process_stockholders_rows(rows, report_type)
         elif report_type == ReportType.CASH_DIVIDENDS:
@@ -481,6 +483,12 @@ class PSEDataScraper:
             from ..core.processors.quarterly_report import QuarterlyReportProcessor
             processor = QuarterlyReportProcessor(self.logger)
             result = processor.process(iframe_soup, stock_name, disclosure_date)
+        elif report_type == ReportType.SHARE_BUYBACK and not self.stop_iteration:
+            from ..core.processors.share_buyback import ShareBuybackProcessor
+            processor = ShareBuybackProcessor(self.logger)
+            result = processor.process(iframe_soup, stock_name, disclosure_date)
+            if result:
+                self.stop_iteration = True
         elif report_type == ReportType.CASH_DIVIDENDS and not self.stop_iteration:
             from ..core.processors.cash_dividends import CashDividendsProcessor
             processor = CashDividendsProcessor(self.logger)

@@ -23,6 +23,7 @@ REPORT_TYPES = {
     "annual": ReportType.ANNUAL,
     "stockholders": ReportType.TOP_100_STOCKHOLDERS,
     "cash_dividends": ReportType.CASH_DIVIDENDS,
+    "share_buyback": ReportType.SHARE_BUYBACK,
 }
 
 # CLI Context class to pass settings between commands
@@ -523,7 +524,8 @@ def _run_interactive_mode(ctx: CLIContext):
             "2. Quarterly Report", 
             "3. Annual Report",
             "4. List of Top 100 Stockholders",
-            "5. Declaration of Cash Dividends"
+            "5. Declaration of Cash Dividends",
+            "8. Share Buy-Back Transactions"
         ]
         for report in reports:
             console.print(f"  {report}")
@@ -541,14 +543,15 @@ def _run_interactive_mode(ctx: CLIContext):
                 "4. List of Top 100 Stockholders",
                 "5. Declaration of Cash Dividends",
                 "6. Settings",
-                "7. Exit"
+                "7. Exit",
+                "8. Share Buy-Back Transactions"
             ]
             
             for option in menu_options:
                 console.print(option)
             
             try:
-                choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4", "5", "6", "7"])
+                choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4", "5", "6", "7", "8"])
                 
                 if choice == "7":  # Exit
                     console.print("[green]👋 Goodbye![/green]")
@@ -565,6 +568,7 @@ def _run_interactive_mode(ctx: CLIContext):
                     "3": ReportType.ANNUAL, 
                     "4": ReportType.TOP_100_STOCKHOLDERS,
                     "5": ReportType.CASH_DIVIDENDS,
+                    "8": ReportType.SHARE_BUYBACK,
                 }
                 
                 report_type = report_type_map[choice]
