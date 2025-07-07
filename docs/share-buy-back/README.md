@@ -102,11 +102,26 @@ Interface: CLI menu option 8
 
 ## UAT Validation Results
 
-✅ **UAT Feedback Resolved** (July 7, 2025)
+### ✅ UAT Feedback #1 - RESOLVED (July 7, 2025 AM)
 - Successfully captures July 7, 2025 amended report with 1,400,000 shares
 - Amendment detection working with `is_amended_report=True`
 - All 10 individual transactions properly aggregated
 - Captures most recent amended documents correctly
+
+### 📋 UAT Feedback #2 - NEW REQUIREMENTS (July 7, 2025 PM)
+**Request:** Simplified output format with 5 essential fields only
+
+**Current:** 17 fields with complete transaction details
+**Requested:** 5 core fields with latest data only
+
+**Required Fields:**
+1. Date (disclosure date)
+2. Total Number of Shares Purchased
+3. Cumulative shares purchased to date
+4. Total Amount Appropriated (budget) 
+5. Total Amount of Shares repurchased
+
+**Status:** Requirements documented, ready for implementation planning
 
 ## Real Data Output Format
 

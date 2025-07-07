@@ -115,3 +115,30 @@ ALI,2025-07-07,True,10,1400000,27.25,38152915.0,14562064253,14560664253,1400000,
 **Rollback Plan:** Standard git revert if issues discovered
 **Monitoring:** Standard application monitoring applies
 **Support:** Existing support processes cover new feature
+
+---
+
+## 📋 UAT Feedback #2 - July 7, 2025 16:17
+
+### New Requirements Identified
+
+**Request:** Simplified output with only 5 essential fields and latest data only
+
+**Required Fields:**
+1. Date (disclosure date)
+2. Total Number of Shares Purchased
+3. Cumulative shares purchased to date  
+4. Total Amount Appropriated (budget)
+5. Total Amount of Shares repurchased
+
+**Key Changes Needed:**
+- Capture only latest/most recent share buyback (not all historical)
+- Reduce from 17 fields to 5 core fields
+- Apply to all companies with share buyback data
+
+**Status:** 📋 **NEW REQUIREMENTS DOCUMENTED**
+- Requirements analysis complete
+- Implementation options identified
+- Ready for development planning
+
+**Documentation:** See `/docs/share-buy-back/uat_2_2025_07_07/` for detailed requirements
