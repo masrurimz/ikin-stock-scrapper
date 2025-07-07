@@ -484,8 +484,8 @@ class PSEDataScraper:
             processor = QuarterlyReportProcessor(self.logger)
             result = processor.process(iframe_soup, stock_name, disclosure_date)
         elif report_type == ReportType.SHARE_BUYBACK and not self.stop_iteration:
-            from ..core.processors.share_buyback import ShareBuybackProcessor
-            processor = ShareBuybackProcessor(self.logger)
+            from ..core.processors.share_buyback_refined import ShareBuybackProcessorRefined
+            processor = ShareBuybackProcessorRefined(self.logger)
             result = processor.process(iframe_soup, stock_name, disclosure_date)
             if result:
                 self.stop_iteration = True

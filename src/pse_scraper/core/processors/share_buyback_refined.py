@@ -5,9 +5,8 @@ Refined processor for share buyback transaction reports based on real data analy
 import re
 from typing import Dict, Optional, List
 from bs4 import BeautifulSoup
-from datetime import datetime
 
-from ...utils import clean_text, convert_to_numeric
+from ...utils import clean_text
 
 
 class ShareBuybackProcessorRefined:
@@ -120,14 +119,14 @@ class ShareBuybackProcessorRefined:
                     continue
                 
                 # Parse transaction rows
-                if header_found and cell_texts[0] and "," in cell_texts[0]:  # Date format check
+                if header_found and cell_texts[0] and any(month in cell_texts[0] for month in ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]):
                     date_str = cell_texts[0]
                     shares_str = cell_texts[1].replace(",", "") if len(cell_texts) > 1 else ""
                     price_str = cell_texts[2] if len(cell_texts) > 2 else ""
                     
                     try:
                         shares = int(shares_str) if shares_str.isdigit() else 0
-                        price = float(price_str) if price_str.replace(".", "").isdigit() else 0
+                        price = float(price_str) if price_str.replace(".", "").replace(",", "").isdigit() else 0
                         
                         if shares > 0 and price > 0:
                             transaction = {
@@ -152,16 +151,8 @@ class ShareBuybackProcessorRefined:
             "total_transactions": len(transactions),
             "total_shares_purchased": total_shares,
             "weighted_average_price": round(weighted_avg_price, 2),
-            "total_transaction_value": round(total_value, 2),
-            "transactions": transactions
+            "total_transaction_value": round(total_value, 2)
         }
-        
-        # Add individual transaction details
-        for i, txn in enumerate(transactions[:5]):  # Limit to first 5 transactions
-            result[f"transaction_{i+1}_date"] = txn["date"]
-            result[f"transaction_{i+1}_shares"] = txn["shares"]
-            result[f"transaction_{i+1}_price"] = txn["price"]
-            result[f"transaction_{i+1}_value"] = txn["value"]
         
         return result
 
