@@ -58,9 +58,20 @@ class ShareBuybackProcessor:
         Returns:
             Dictionary containing share buyback data
         """
+        # Check if this is an amended report
+        page_content = soup.get_text()
+        is_amended = ("[Amend" in page_content or "Amend-" in page_content or 
+                     "amended" in page_content.lower() or "amendment" in page_content.lower())
+        
+        # Debug logging for amendment detection
+        self.logger.info(f"Amendment detection for {stock_name} on {report_date}: {is_amended}")
+        if is_amended:
+            self.logger.info(f"Amendment keywords found in document content")
+        
         result = {
             "stock_name": stock_name,
-            "disclosure_date": report_date
+            "disclosure_date": report_date,
+            "is_amended_report": is_amended
         }
         
         # Extract transaction details

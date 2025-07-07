@@ -483,12 +483,11 @@ class PSEDataScraper:
             from ..core.processors.quarterly_report import QuarterlyReportProcessor
             processor = QuarterlyReportProcessor(self.logger)
             result = processor.process(iframe_soup, stock_name, disclosure_date)
-        elif report_type == ReportType.SHARE_BUYBACK and not self.stop_iteration:
+        elif report_type == ReportType.SHARE_BUYBACK:
             from ..core.processors.share_buyback import ShareBuybackProcessor
             processor = ShareBuybackProcessor(self.logger)
             result = processor.process(iframe_soup, stock_name, disclosure_date)
-            if result:
-                self.stop_iteration = True
+            # Don't stop iteration for share buyback to capture all reports including amendments
         elif report_type == ReportType.CASH_DIVIDENDS and not self.stop_iteration:
             from ..core.processors.cash_dividends import CashDividendsProcessor
             processor = CashDividendsProcessor(self.logger)

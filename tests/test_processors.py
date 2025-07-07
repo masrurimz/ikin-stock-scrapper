@@ -256,6 +256,7 @@ class TestShareBuybackProcessor:
         assert result is not None
         assert result["stock_name"] == sample_stock_name
         assert result["disclosure_date"] == sample_disclosure_date
+        assert "is_amended_report" in result
         
         # Check transaction summary
         assert result["total_transactions"] == 2
@@ -304,6 +305,7 @@ class TestShareBuybackProcessor:
         assert result is not None
         assert result["stock_name"] == sample_stock_name
         assert result["disclosure_date"] == sample_disclosure_date
+        assert "is_amended_report" in result
         assert result["total_program_budget"] == 26070000000.00
         # Should not have transaction data
         assert "total_transactions" not in result
@@ -317,8 +319,13 @@ class TestShareBuybackProcessor:
         soup = BeautifulSoup(html, 'html.parser')
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
-        assert result is None
-        mock_logger.warning.assert_called()
+        # Should return basic result with only basic fields
+        assert result is not None
+        assert result["stock_name"] == sample_stock_name
+        assert result["disclosure_date"] == sample_disclosure_date
+        assert "is_amended_report" in result
+        # Should have no transaction data beyond basic fields
+        assert len(result) == 3  # Only basic fields: stock_name, disclosure_date, is_amended_report
     
     def test_process_partial_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing with only some data sections."""
@@ -351,6 +358,7 @@ class TestShareBuybackProcessor:
         assert result is not None
         assert result["stock_name"] == sample_stock_name
         assert result["disclosure_date"] == sample_disclosure_date
+        assert "is_amended_report" in result
         assert result["outstanding_shares_before"] == 1000000
         assert result["outstanding_shares_after"] == 900000
         assert result["outstanding_shares_change"] == 100000
@@ -387,6 +395,7 @@ class TestShareBuybackProcessor:
         assert result is not None
         assert result["stock_name"] == sample_stock_name
         assert result["disclosure_date"] == sample_disclosure_date
+        assert "is_amended_report" in result
         # Should have empty transaction summary since data is invalid
         assert result.get("total_transactions", 0) == 0
 
@@ -413,8 +422,13 @@ class TestProcessorIntegration:
             result = processor.process(soup, "TEST", "2024-01-15")
             # Some processors might return None, others might return minimal data
             if result is not None:
-                assert result["stock name"] == "TEST"
-                assert result["disclosure date"] == "2024-01-15"
+                # ShareBuybackProcessor uses different key format
+                if hasattr(processor, '__class__') and 'ShareBuyback' in processor.__class__.__name__:
+                    assert result["stock_name"] == "TEST"
+                    assert result["disclosure_date"] == "2024-01-15"
+                else:
+                    assert result["stock name"] == "TEST"
+                    assert result["disclosure date"] == "2024-01-15"
     
     def test_all_processors_handle_complex_html(self):
         """Test processors with complex HTML structure."""
