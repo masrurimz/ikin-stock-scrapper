@@ -68,8 +68,8 @@ def cli(ctx, version):
               help='Output formats (can specify multiple)')
 @click.option('--workers', '-w', default=5, type=click.IntRange(1, 10),
               help='Number of concurrent workers (1-10)')
-@click.option('--use-proxies/--no-proxies', default=False,
-              help='Enable/disable proxy rotation')
+@click.option('--use-proxies/--no-proxies', default=True,
+              help='Enable/disable proxy rotation (default: enabled)')
 @click.option('--no-logging', is_flag=True, default=False,
               help='Disable logging')
 @click.option('--simplified', is_flag=True, default=False,
@@ -213,8 +213,8 @@ def scrape(ctx: CLIContext, company: str, report_type: str, output: str,
               help='Output formats (can specify multiple)')
 @click.option('--workers', '-w', default=5, type=click.IntRange(1, 10),
               help='Number of concurrent workers (1-10)')
-@click.option('--use-proxies/--no-proxies', default=False,
-              help='Enable/disable proxy rotation')
+@click.option('--use-proxies/--no-proxies', default=True,
+              help='Enable/disable proxy rotation (default: enabled)')
 @click.option('--no-logging', is_flag=True, default=False,
               help='Disable logging')
 @click.option('--force', is_flag=True, default=False,
@@ -316,7 +316,20 @@ def bulk(ctx: CLIContext, start_id: int, end_id: int, report_type: str,
         
         # Summary of results
         total_records = len(scraper.data)
-        companies_with_data = len(set(record.get('stock name', '') for record in scraper.data if record.get('stock name')))
+        
+        
+        # Handle different field names for company identification
+        company_identifiers = []
+        for record in scraper.data:
+            # Try different possible field names for company identification
+            company_id = (record.get('symbol', '') or 
+                         record.get('stock name', '') or 
+                         record.get('company_name', '') or
+                         record.get('stock_name', ''))
+            if company_id:
+                company_identifiers.append(company_id)
+        
+        companies_with_data = len(set(company_identifiers))
         
         if total_records > 0:
             console.print(f"\n[green]✅ BULK PROCESSING COMPLETED![/green]")
@@ -490,8 +503,18 @@ def _display_results(data: List, output: str, formats: List[str],
             style="red"
         ))
     else:
-        # Get some details about the data
-        companies_found = len(set(record.get('stock name', '') for record in data if record.get('stock name')))
+        # Get some details about the data - handle different field names for company identification
+        company_identifiers = []
+        for record in data:
+            # Try different possible field names for company identification
+            company_id = (record.get('symbol', '') or 
+                         record.get('stock name', '') or 
+                         record.get('company_name', '') or
+                         record.get('stock_name', ''))
+            if company_id:
+                company_identifiers.append(company_id)
+        
+        companies_found = len(set(company_identifiers))
         
         result_text = f"[bold green]✅ PROCESSING COMPLETED![/bold green]\n\n"
         result_text += f"📊 Records found: [bold]{len(data)}[/bold]\n"
@@ -501,10 +524,9 @@ def _display_results(data: List, output: str, formats: List[str],
             result_text += f"📈 Companies with data: [bold]{companies_found}[/bold]\n"
             result_text += f"🎯 Success rate: [bold]{(companies_found/company_count)*100:.1f}%[/bold]\n"
         elif companies_found > 0:
-            # Show company names found
-            company_names = [record.get('stock name', '') for record in data if record.get('stock name')]
-            if company_names:
-                unique_companies = list(set(company_names))
+            # Show company names found - use the already extracted company identifiers
+            if company_identifiers:
+                unique_companies = list(set(company_identifiers))
                 if len(unique_companies) <= 3:
                     result_text += f"🏢 Company: [bold]{', '.join(unique_companies)}[/bold]\n"
                 else:
