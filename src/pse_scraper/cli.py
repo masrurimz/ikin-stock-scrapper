@@ -3,6 +3,7 @@
 import click
 import sys
 import logging
+import threading
 from pathlib import Path
 from typing import List, Tuple
 
@@ -33,6 +34,7 @@ class CLIContext:
         self.use_proxies = False
         self.enable_logging = True
         self.formats = ["csv"]
+        self.simplified = False
         
 @click.group(invoke_without_command=True)
 @click.option('--version', is_flag=True, help='Show version information')
@@ -70,9 +72,11 @@ def cli(ctx, version):
               help='Enable/disable proxy rotation')
 @click.option('--no-logging', is_flag=True, default=False,
               help='Disable logging')
+@click.option('--simplified', is_flag=True, default=False,
+              help='Use simplified output format (6 core fields, latest data only)')
 @click.pass_obj
 def scrape(ctx: CLIContext, company: str, report_type: str, output: str, 
-           formats: List[str], workers: int, use_proxies: bool, no_logging: bool):
+           formats: List[str], workers: int, use_proxies: bool, no_logging: bool, simplified: bool):
     """Scrape data for a single company.
     
     COMPANY: Company symbol (e.g., 'SM', 'BDO') or numeric company ID
@@ -85,7 +89,7 @@ def scrape(ctx: CLIContext, company: str, report_type: str, output: str,
     enable_logging = not no_logging
     
     # Display configuration
-    _display_scrape_config(company, report_type, output, formats, workers, use_proxies, enable_logging)
+    _display_scrape_config(company, report_type, output, formats, workers, use_proxies, enable_logging, simplified)
     
     # Initialize scraper with CLI mode for quiet logging
     with console.status(f"[bold green]Initializing scraper with {workers} worker(s)..."):
@@ -150,7 +154,7 @@ def scrape(ctx: CLIContext, company: str, report_type: str, output: str,
             progress_thread.start()
             
             # Scrape data with callback
-            scraper.scrape_data(company.upper(), REPORT_TYPES[report_type], progress_callback)
+            scraper.scrape_data(company.upper(), REPORT_TYPES[report_type], progress_callback, simplified=simplified)
             
             # Wait for progress thread to finish
             progress_thread.join(timeout=1.0)
@@ -215,10 +219,12 @@ def scrape(ctx: CLIContext, company: str, report_type: str, output: str,
               help='Disable logging')
 @click.option('--force', is_flag=True, default=False,
               help='Skip confirmation for large ranges')
+@click.option('--simplified', is_flag=True, default=False,
+              help='Use simplified output format (6 core fields, latest data only)')
 @click.pass_obj
 def bulk(ctx: CLIContext, start_id: int, end_id: int, report_type: str,
          output: str, formats: List[str], workers: int, use_proxies: bool, 
-         no_logging: bool, force: bool):
+         no_logging: bool, force: bool, simplified: bool):
     """Bulk scrape multiple companies by ID range.
     
     START_ID: Starting company ID
@@ -243,7 +249,7 @@ def bulk(ctx: CLIContext, start_id: int, end_id: int, report_type: str,
             sys.exit(0)
     
     # Display configuration
-    _display_bulk_config(start_id, end_id, report_type, output, formats, workers, use_proxies, enable_logging)
+    _display_bulk_config(start_id, end_id, report_type, output, formats, workers, use_proxies, enable_logging, simplified)
     
     # Initialize scraper with CLI mode for quiet logging
     with console.status(f"[bold green]Initializing scraper with {workers} worker(s)..."):
@@ -293,7 +299,7 @@ def bulk(ctx: CLIContext, start_id: int, end_id: int, report_type: str,
                     progress.update(detail_task, description=f"   {icon} {message}")
                 
                 # Process the company with detailed progress
-                scraper.scrape_data(str(company_id), REPORT_TYPES[report_type], progress_callback)
+                scraper.scrape_data(str(company_id), REPORT_TYPES[report_type], progress_callback, simplified=simplified)
                 
                 # Check if we found data for this company
                 records_found = len(scraper.data) - initial_count
@@ -413,7 +419,7 @@ def config(ctx: CLIContext):
 
 
 def _display_scrape_config(company: str, report_type: str, output: str, 
-                          formats: List[str], workers: int, use_proxies: bool, enable_logging: bool):
+                          formats: List[str], workers: int, use_proxies: bool, enable_logging: bool, simplified: bool = False):
     """Display scraping configuration."""
     table = Table(title="🔧 Scraping Configuration")
     table.add_column("Setting", style="cyan")
@@ -427,12 +433,20 @@ def _display_scrape_config(company: str, report_type: str, output: str,
     table.add_row("Proxies", "Enabled" if use_proxies else "Disabled")
     table.add_row("Logging", "Enabled" if enable_logging else "Disabled")
     
+    # Show mode with special handling for share buyback reports
+    if report_type == "share_buyback":
+        table.add_row("Mode", "Simplified (auto-enabled for share buyback reports)")
+    elif simplified:
+        table.add_row("Mode", "Simplified (6 fields, latest only)")
+    else:
+        table.add_row("Mode", "Detailed (all fields, all reports)")
+    
     console.print(table)
     console.print()
 
 
 def _display_bulk_config(start_id: int, end_id: int, report_type: str, output: str,
-                        formats: List[str], workers: int, use_proxies: bool, enable_logging: bool):
+                        formats: List[str], workers: int, use_proxies: bool, enable_logging: bool, simplified: bool = False):
     """Display bulk processing configuration."""
     company_count = end_id - start_id + 1
     
@@ -448,6 +462,14 @@ def _display_bulk_config(start_id: int, end_id: int, report_type: str, output: s
     table.add_row("Workers", str(workers))
     table.add_row("Proxies", "Enabled" if use_proxies else "Disabled")
     table.add_row("Logging", "Enabled" if enable_logging else "Disabled")
+    
+    # Show mode with special handling for share buyback reports
+    if report_type == "share_buyback":
+        table.add_row("Mode", "Simplified (auto-enabled for share buyback reports)")
+    elif simplified:
+        table.add_row("Mode", "Simplified (6 fields, latest only)")
+    else:
+        table.add_row("Mode", "Detailed (all fields, all reports)")
     
     console.print(table)
     console.print()
@@ -514,8 +536,8 @@ def _run_interactive_mode(ctx: CLIContext):
         ))
         
         console.print("\n🔍 [bold]SEARCH OPTIONS:[/bold]")
-        console.print("  • Company Symbol: SM, BDO, PLDT, etc.")
-        console.print("  • Single Company ID: Any number (1, 2, 3, etc.)")
+        console.print("  • Company Symbol: SM, BDO, PLDT, etc. [yellow](works for most reports)[/yellow]")
+        console.print("  • Single Company ID: Any number (1, 2, 3, etc.) [green](recommended for share buyback)[/green]")
         console.print("  • 🚀 BULK PROCESSING: Range of IDs (e.g., 1-100)")
         
         console.print("\n📊 [bold]AVAILABLE REPORTS:[/bold]")
@@ -525,7 +547,7 @@ def _run_interactive_mode(ctx: CLIContext):
             "3. Annual Report",
             "4. List of Top 100 Stockholders",
             "5. Declaration of Cash Dividends",
-            "8. Share Buy-Back Transactions"
+            "6. Share Buy-Back Transactions"
         ]
         for report in reports:
             console.print(f"  {report}")
@@ -542,9 +564,9 @@ def _run_interactive_mode(ctx: CLIContext):
                 "3. Annual Report",
                 "4. List of Top 100 Stockholders",
                 "5. Declaration of Cash Dividends",
-                "6. Settings",
-                "7. Exit",
-                "8. Share Buy-Back Transactions"
+                "6. Share Buy-Back Transactions",
+                "7. Settings",
+                "8. Exit"
             ]
             
             for option in menu_options:
@@ -553,11 +575,11 @@ def _run_interactive_mode(ctx: CLIContext):
             try:
                 choice = Prompt.ask("Enter your choice", choices=["1", "2", "3", "4", "5", "6", "7", "8"])
                 
-                if choice == "7":  # Exit
+                if choice == "8":  # Exit
                     console.print("[green]👋 Goodbye![/green]")
                     break
                     
-                elif choice == "6":  # Settings
+                elif choice == "7":  # Settings
                     _interactive_settings(ctx, scraper)
                     continue
                 
@@ -568,7 +590,7 @@ def _run_interactive_mode(ctx: CLIContext):
                     "3": ReportType.ANNUAL, 
                     "4": ReportType.TOP_100_STOCKHOLDERS,
                     "5": ReportType.CASH_DIVIDENDS,
-                    "8": ReportType.SHARE_BUYBACK,
+                    "6": ReportType.SHARE_BUYBACK,
                 }
                 
                 report_type = report_type_map[choice]
@@ -580,11 +602,18 @@ def _run_interactive_mode(ctx: CLIContext):
                 filename = Prompt.ask("Enter output filename")
                 
                 console.print("\n[bold]Company Selection Options:[/bold]")
-                console.print("1. Single company by symbol: Enter company symbol (e.g., 'SM', 'BDO')")
-                console.print("2. Single company by ID: Enter one company ID (e.g., '5')")
-                console.print("3. Bulk processing: Enter company ID range")
-                
-                start_company = Prompt.ask("Enter company symbol OR starting company ID").strip()
+                if report_type == ReportType.SHARE_BUYBACK:
+                    console.print("1. Single company by ID: Enter one company ID (e.g., '180' for ALI)")
+                    console.print("2. Bulk processing: Enter company ID range")
+                    console.print("[yellow]Note: Share buyback reports work best with company IDs, not symbols[/yellow]")
+                    
+                    start_company = Prompt.ask("Enter company ID OR starting company ID for bulk").strip()
+                else:
+                    console.print("1. Single company by symbol: Enter company symbol (e.g., 'SM', 'BDO')")
+                    console.print("2. Single company by ID: Enter one company ID (e.g., '5')")
+                    console.print("3. Bulk processing: Enter company ID range")
+                    
+                    start_company = Prompt.ask("Enter company symbol OR starting company ID").strip()
                 
                 if not start_company:
                     console.print("[red]Error: Company symbol/ID cannot be empty.[/red]")
@@ -781,7 +810,7 @@ def _run_interactive_mode(ctx: CLIContext):
                         progress_thread.start()
                         
                         # Process the company with detailed progress
-                        scraper.scrape_data(start_company.upper(), report_type, progress_callback)
+                        scraper.scrape_data(start_company.upper(), report_type, progress_callback, simplified=ctx.simplified)
                         
                         # Wait for progress thread to finish
                         progress_thread.join(timeout=1.0)
@@ -825,11 +854,12 @@ def _interactive_settings(ctx: CLIContext, scraper: PSEDataScraper):
         settings_table.add_row("2. Proxy", "Enabled" if ctx.use_proxies else "Disabled") 
         settings_table.add_row("3. Max Workers", str(ctx.max_workers))
         settings_table.add_row("4. Save Format", " and ".join(ctx.formats))
-        settings_table.add_row("5. Back to Main Menu", "")
+        settings_table.add_row("5. Output Mode", "Simplified (6 fields, latest only)" if ctx.simplified else "Detailed (all fields)")
+        settings_table.add_row("6. Back to Main Menu", "")
         
         console.print(settings_table)
         
-        setting_choice = Prompt.ask("Select setting", choices=["1", "2", "3", "4", "5"])
+        setting_choice = Prompt.ask("Select setting", choices=["1", "2", "3", "4", "5", "6"])
         
         if setting_choice == "1":
             ctx.enable_logging = not ctx.enable_logging
@@ -866,6 +896,10 @@ def _interactive_settings(ctx: CLIContext, scraper: PSEDataScraper):
             console.print(f"[green]✓ Save format set to: {' and '.join(ctx.formats)}[/green]")
             
         elif setting_choice == "5":
+            ctx.simplified = not ctx.simplified
+            console.print(f"[green]✓ Output mode set to {'Simplified (6 fields, latest only)' if ctx.simplified else 'Detailed (all fields)'}[/green]")
+            
+        elif setting_choice == "6":
             break
 
 

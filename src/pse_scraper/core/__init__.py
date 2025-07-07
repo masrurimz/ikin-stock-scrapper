@@ -151,7 +151,7 @@ class PSEDataScraper:
 
         return grid
 
-    def scrape_data(self, company_id: str, report_type: ReportType, progress_callback=None) -> List[Dict]:
+    def scrape_data(self, company_id: str, report_type: ReportType, progress_callback=None, simplified: bool = False) -> List[Dict]:
         """
         Scrape data from PSE Edge with concurrent processing.
 
@@ -159,6 +159,7 @@ class PSEDataScraper:
             company_id: Company ID
             report_type: Report type
             progress_callback: Optional callback function for progress updates
+            simplified: If True, return simplified output format with latest data only
             
         Returns:
             List of dictionaries containing scraped data
@@ -167,10 +168,16 @@ class PSEDataScraper:
             if progress_callback:
                 progress_callback("initializing", f"Starting scraper for {company_id}")
                 
+            # Auto-enable simplified mode for share buyback reports (UAT Feedback #2)
+            if report_type == ReportType.SHARE_BUYBACK:
+                simplified = True
+                self.logger.info(f"Auto-enabled simplified mode for share buyback report (UAT Feedback #2)")
+                
             self.logger.info(
-                f"Starting data scraping for company_id: {company_id}, report_type: {report_type.value}"
+                f"Starting data scraping for company_id: {company_id}, report_type: {report_type.value}, simplified: {simplified}"
             )
             self.stop_iteration = False
+            self.simplified_mode = simplified  # Store simplified flag for processors
 
             payload = {
                 "keyword": company_id,
@@ -237,10 +244,19 @@ class PSEDataScraper:
                         if progress_callback:
                             progress_callback("warning", f"Error processing page: {str(e)[:50]}...")
                             
+            # For simplified mode, return only the latest (first) record since PSE returns newest first
+            if simplified and self.data:
+                self.logger.info(f"Simplified mode: Returning only latest record out of {len(self.data)} found")
+                latest_record = [self.data[0]]  # Keep only the first (most recent) record
+                self.data = latest_record
+                            
             if progress_callback:
                 records_found = len(self.data)
                 if records_found > 0:
-                    progress_callback("success", f"Found {records_found} record(s)")
+                    if simplified:
+                        progress_callback("success", f"Found latest record (simplified mode)")
+                    else:
+                        progress_callback("success", f"Found {records_found} record(s)")
                 else:
                     progress_callback("empty", "No data found in reports")
                         
@@ -486,8 +502,11 @@ class PSEDataScraper:
         elif report_type == ReportType.SHARE_BUYBACK:
             from ..core.processors.share_buyback import ShareBuybackProcessor
             processor = ShareBuybackProcessor(self.logger)
-            result = processor.process(iframe_soup, stock_name, disclosure_date)
+            result = processor.process(iframe_soup, stock_name, disclosure_date, simplified=getattr(self, 'simplified_mode', False))
             # Don't stop iteration for share buyback to capture all reports including amendments
+            # But if simplified mode, stop after first successful result
+            if getattr(self, 'simplified_mode', False) and result:
+                self.stop_iteration = True
         elif report_type == ReportType.CASH_DIVIDENDS and not self.stop_iteration:
             from ..core.processors.cash_dividends import CashDividendsProcessor
             processor = CashDividendsProcessor(self.logger)

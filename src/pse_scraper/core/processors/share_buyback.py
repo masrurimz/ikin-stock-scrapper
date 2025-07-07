@@ -15,7 +15,7 @@ class ShareBuybackProcessor:
     def __init__(self, logger):
         self.logger = logger
 
-    def process(self, soup: BeautifulSoup, stock_name: str, disclosure_date: str) -> Optional[Dict]:
+    def process(self, soup: BeautifulSoup, stock_name: str, disclosure_date: str, simplified: bool = False) -> Optional[Dict]:
         """
         Process share buyback transaction report with refined extraction.
 
@@ -23,20 +23,25 @@ class ShareBuybackProcessor:
             soup: BeautifulSoup object of the document
             stock_name: Stock name
             disclosure_date: Disclosure date
+            simplified: If True, return only 6 core fields (symbol + 5 data fields) in simplified format
 
         Returns:
             Dictionary containing processed data
         """
         try:
-            self.logger.info(f"Processing share buyback for {stock_name} on {disclosure_date}")
+            self.logger.info(f"Processing share buyback for {stock_name} on {disclosure_date} (simplified={simplified})")
             
             # Extract structured share buyback data
-            result = self._extract_buyback_data(soup, stock_name, disclosure_date)
+            result = self._extract_buyback_data(soup, stock_name, disclosure_date, simplified)
             
             if result and len(result) > 2:  # More than stock_name and disclosure_date
                 self.logger.info(f"Successfully processed share buyback for {stock_name}")
-                self.logger.info(f"Extracted transactions: {result.get('total_transactions', 0)}")
-                self.logger.info(f"Total shares purchased: {result.get('total_shares_purchased', 0)}")
+                if simplified:
+                    self.logger.info(f"Simplified mode: 6 core fields extracted (symbol + 5 data fields)")
+                else:
+                    self.logger.info(f"Detailed mode: {len(result)} fields extracted")
+                    self.logger.info(f"Extracted transactions: {result.get('total_transactions', 0)}")
+                    self.logger.info(f"Total shares purchased: {result.get('total_shares_purchased', 0)}")
                 return result
             else:
                 self.logger.warning(f"No share buyback data extracted for {stock_name}")
@@ -46,7 +51,7 @@ class ShareBuybackProcessor:
             self.logger.error(f"Error processing share buyback for {stock_name}: {e}")
             return None
 
-    def _extract_buyback_data(self, soup: BeautifulSoup, stock_name: str, report_date: str) -> Dict:
+    def _extract_buyback_data(self, soup: BeautifulSoup, stock_name: str, report_date: str, simplified: bool = False) -> Dict:
         """
         Extract share buyback data based on discovered structure.
 
@@ -68,31 +73,46 @@ class ShareBuybackProcessor:
         if is_amended:
             self.logger.info(f"Amendment keywords found in document content")
         
-        result = {
-            "stock_name": stock_name,
-            "disclosure_date": report_date,
-            "is_amended_report": is_amended
-        }
-        
-        # Extract transaction details
+        # Extract core data needed for both modes
         transactions = self._extract_transaction_details(soup)
-        if transactions:
-            result.update(transactions)
-        
-        # Extract before/after share counts
-        share_effects = self._extract_share_effects(soup)
-        if share_effects:
-            result.update(share_effects)
-        
-        # Extract program summary
         program_summary = self._extract_program_summary(soup)
-        if program_summary:
-            result.update(program_summary)
         
-        # Extract contact information
-        contact_info = self._extract_contact_info(soup)
-        if contact_info:
-            result.update(contact_info)
+        if simplified:
+            # Simplified mode: Return 6 required fields with symbol as first column
+            result = {
+                "symbol": stock_name,
+                "date": report_date,
+                "total_shares_purchased": transactions.get("total_shares_purchased", 0) if transactions else 0,
+                "cumulative_shares_purchased": program_summary.get("cumulative_shares_purchased", 0) if program_summary else 0,
+                "total_program_budget": program_summary.get("total_program_budget", 0) if program_summary else 0,
+                "total_amount_spent": program_summary.get("total_amount_spent", 0) if program_summary else 0,
+            }
+            self.logger.info(f"Simplified output for {stock_name}: {result}")
+        else:
+            # Detailed mode: Return all fields as before
+            result = {
+                "stock_name": stock_name,
+                "disclosure_date": report_date,
+                "is_amended_report": is_amended
+            }
+            
+            # Extract transaction details
+            if transactions:
+                result.update(transactions)
+            
+            # Extract before/after share counts
+            share_effects = self._extract_share_effects(soup)
+            if share_effects:
+                result.update(share_effects)
+            
+            # Extract program summary
+            if program_summary:
+                result.update(program_summary)
+            
+            # Extract contact information
+            contact_info = self._extract_contact_info(soup)
+            if contact_info:
+                result.update(contact_info)
         
         return result
 
