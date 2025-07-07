@@ -159,6 +159,9 @@ poetry run pse-scraper
 # Direct CLI usage
 poetry run pse-scraper SM public_ownership --output sm_data
 
+# Share Buy-Back example
+poetry run pse-scraper 180 share_buyback --output ali_buyback
+
 # Using built executable
 ./releases/pse-scraper-* --help
 ```
@@ -200,13 +203,14 @@ poetry run pse-scraper SM public_ownership --output sm_data
 
 ### Report Types
 
-The application supports 5 main report types defined in `ReportType` enum:
+The application supports 6 main report types defined in `ReportType` enum:
 
 - `PUBLIC_OWNERSHIP` - Company ownership structure
 - `ANNUAL` - Annual financial reports
 - `QUARTERLY` - Quarterly financial reports  
 - `TOP_100_STOCKHOLDERS` - Major shareholders lists
 - `CASH_DIVIDENDS` - Dividend declarations
+- `SHARE_BUYBACK` - Share buyback transactions (✅ Menu option 8)
 
 ### Adding New Report Types
 
@@ -241,7 +245,57 @@ The application supports 5 main report types defined in `ReportType` enum:
 
 ### CLI Menu System
 
-The interactive CLI uses a numbered menu system (1-7) matching the original interface. When adding new report types, maintain this numbering for backward compatibility.
+The interactive CLI uses a numbered menu system (1-8) with the following options:
+1. Public Ownership
+2. Quarterly Report  
+3. Annual Report
+4. List of Top 100 Stockholders
+5. Declaration of Cash Dividends
+6. Settings
+7. Exit
+8. Share Buy-Back Transactions ✅
+
+When adding new report types, maintain this numbering for backward compatibility.
+
+### Share Buy-Back Feature
+
+**✅ Fully Implemented with UAT Validation**
+
+The Share Buy-Back feature (menu option 8) extracts comprehensive buyback transaction data including:
+
+**Transaction Details:**
+- Individual transaction records with dates, shares, and prices
+- Aggregated totals and weighted average prices
+- Transaction count and total value
+
+**Share Effects:**
+- Before/after outstanding shares counts
+- Before/after treasury shares counts  
+- Net change calculations
+
+**Program Summary:**
+- Cumulative shares purchased to date
+- Total program budget allocation
+- Total amount spent on repurchases
+
+**Amendment Detection:**
+- `is_amended_report` field tracks amended documents
+- Automatically detects [Amend-1], amended, amendment keywords
+- Captures most recent versions of reports
+
+**Real Data Example (ALI - Company ID 180):**
+```csv
+ALI,2025-07-07,True,10,1400000,27.25,38152915.0,14562064253,14560664253,1400000,2150755595,2152155595,1400000,876032246,26070000000.0,22885247993.0,Michael Blase Aquilizan,Department Manager
+```
+
+**Usage:**
+```bash
+# Command line
+poetry run pse-scraper scrape 180 share_buyback --output results
+
+# Interactive mode - select option 8
+poetry run pse-scraper
+```
 
 ### Processor Pattern
 
