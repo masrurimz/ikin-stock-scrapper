@@ -244,11 +244,21 @@ class PSEDataScraper:
                         if progress_callback:
                             progress_callback("warning", f"Error processing page: {str(e)[:50]}...")
                             
-            # For simplified mode, return only the latest (first) record since PSE returns newest first
+            # For simplified mode, return only the latest record per company/symbol
             if simplified and self.data:
-                self.logger.info(f"Simplified mode: Returning only latest record out of {len(self.data)} found")
-                latest_record = [self.data[0]]  # Keep only the first (most recent) record
-                self.data = latest_record
+                self.logger.info(f"Simplified mode: Filtering to latest record per company from {len(self.data)} total records")
+                
+                # Group records by company symbol/name and keep only the latest (first) for each
+                latest_per_company = {}
+                for record in self.data:
+                    # Get company identifier (symbol for share buyback, stock name for others)
+                    company_id = record.get('symbol') or record.get('stock name') or record.get('company_name') or record.get('stock_name')
+                    if company_id and company_id not in latest_per_company:
+                        latest_per_company[company_id] = record
+                
+                # Convert back to list, preserving original order
+                self.data = list(latest_per_company.values())
+                self.logger.info(f"Simplified mode: Kept {len(self.data)} latest records for {len(latest_per_company)} companies")
                             
             if progress_callback:
                 records_found = len(self.data)
