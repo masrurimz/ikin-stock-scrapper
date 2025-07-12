@@ -78,7 +78,7 @@ class ShareBuybackProcessor:
         if date_registered_info:
             # Use Date Registered from document
             result = {
-                "stock_symbol": stock_name,
+                "stock_symbol": f"_SRP_{stock_name}",
                 "Date_Registered": date_registered_info["full_date"],
                 "Month": date_registered_info["month"],
                 "Year": date_registered_info["year"],
@@ -95,7 +95,7 @@ class ShareBuybackProcessor:
             fallback_date_info = parse_date_registered(report_date)
             if fallback_date_info:
                 result = {
-                    "stock_symbol": stock_name,
+                    "stock_symbol": f"_SRP_{stock_name}",
                     "Date_Registered": fallback_date_info[0],
                     "Month": fallback_date_info[1],
                     "Year": fallback_date_info[2],
@@ -110,7 +110,7 @@ class ShareBuybackProcessor:
             else:
                 # Last resort: minimal UAT #3 structure 
                 result = {
-                    "stock_symbol": stock_name,
+                    "stock_symbol": f"_SRP_{stock_name}",
                     "Date_Registered": report_date,
                     "Month": 0,
                     "Year": 0,
