@@ -31,11 +31,11 @@ class PublicOwnershipProcessor:
             # Pass the full soup instead of just finding one table
             result = self._extract_table_data(soup, stock_name, disclosure_date)
             
-            if result:
+            if result and len(result) > 2:  # More than just stock name and disclosure date
                 self.logger.info(f"Successfully processed public ownership for {stock_name}")
                 return result
             else:
-                self.logger.warning(f"No data extracted for {stock_name}")
+                self.logger.warning(f"No meaningful data extracted for {stock_name}")
                 return None
 
         except Exception as e:

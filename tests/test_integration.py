@@ -47,24 +47,28 @@ class TestSystemIntegration:
         </html>
         """
         
-        # Mock iframe content
+        # Mock iframe content with structure expected by PublicOwnershipProcessor
         iframe_response = Mock()
         iframe_response.text = """
         <html>
             <body>
                 <span id="companyStockSymbol">TEST</span>
-                <table>
+                <table class="type1">
                     <tr>
-                        <th>Company Name</th>
-                        <td>Test Company Inc.</td>
+                        <td>Number of Outstanding Common Shares</td>
+                        <td><span class="valInput">1,500,000,000</span></td>
                     </tr>
                     <tr>
-                        <th>Total Outstanding Shares</th>
-                        <td>1,000,000</td>
+                        <td>Total Number of Shares Owned by the Public</td>
+                        <td><span class="valInput">750,000,000</span></td>
                     </tr>
                     <tr>
-                        <th>Public Ownership Level</th>
-                        <td>35.5%</td>
+                        <td>Public Ownership Percentage</td>
+                        <td><span class="valInput">50.0%</span></td>
+                    </tr>
+                    <tr>
+                        <td>Report Date</td>
+                        <td><span class="valInput">2024-01-15</span></td>
                     </tr>
                 </table>
             </body>
@@ -86,7 +90,8 @@ class TestSystemIntegration:
             
             assert len(results) > 0
             assert results[0]["stock name"] == "TEST"
-            assert "Company Name" in results[0]
+            assert "Number of Outstanding Common Shares" in results[0]
+            assert "Public Ownership Percentage" in results[0]
     
     def test_save_and_load_results(self):
         """Test saving results and verifying file contents."""

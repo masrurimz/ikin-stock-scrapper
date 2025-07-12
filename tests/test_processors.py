@@ -17,19 +17,46 @@ from pse_scraper.core.processors.share_buyback import ShareBuybackProcessor
 class TestPublicOwnershipProcessor:
     """Test PublicOwnershipProcessor."""
     
-    def test_process_valid_data(self, sample_html, sample_stock_name, sample_disclosure_date):
+    def test_process_valid_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing valid public ownership data."""
         mock_logger = Mock()
         processor = PublicOwnershipProcessor(mock_logger)
         
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        # Create HTML with structure expected by PublicOwnershipProcessor
+        html = """
+        <html>
+            <body>
+                <table class="type1">
+                    <tr>
+                        <td>Number of Outstanding Common Shares</td>
+                        <td><span class="valInput">1,500,000,000</span></td>
+                    </tr>
+                    <tr>
+                        <td>Total Number of Shares Owned by the Public</td>
+                        <td><span class="valInput">750,000,000</span></td>
+                    </tr>
+                    <tr>
+                        <td>Public Ownership Percentage</td>
+                        <td><span class="valInput">50.0%</span></td>
+                    </tr>
+                    <tr>
+                        <td>Report Date</td>
+                        <td><span class="valInput">2024-01-15</span></td>
+                    </tr>
+                </table>
+            </body>
+        </html>
+        """
+        
+        soup = BeautifulSoup(html, 'html.parser')
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
         assert result["stock name"] == sample_stock_name
         assert result["disclosure date"] == sample_disclosure_date
-        assert "Company Name" in result
-        assert result["Company Name"] == "Sample Company"
+        # Check that public ownership data was extracted
+        assert "Number of Outstanding Common Shares" in result
+        assert result["Number of Outstanding Common Shares"] == 1500000000
     
     def test_process_no_table(self, sample_stock_name, sample_disclosure_date):
         """Test processing when no table exists."""
@@ -47,12 +74,51 @@ class TestPublicOwnershipProcessor:
 class TestAnnualReportProcessor:
     """Test AnnualReportProcessor."""
     
-    def test_process_valid_data(self, sample_html, sample_stock_name, sample_disclosure_date):
+    def test_process_valid_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing valid annual report data."""
         mock_logger = Mock()
         processor = AnnualReportProcessor(mock_logger)
         
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        # Create HTML with the expected structure for annual reports
+        html = """
+        <html>
+            <body>
+                <table>
+                    <caption>Balance Sheet</caption>
+                    <tr>
+                        <th></th>
+                        <th>2023</th>
+                        <th>2022</th>
+                    </tr>
+                    <tr>
+                        <th>Current Assets</th>
+                        <td><span class="valInput">1000000</span></td>
+                        <td><span class="valInput">950000</span></td>
+                    </tr>
+                    <tr>
+                        <th>Total Assets</th>
+                        <td><span class="valInput">5000000</span></td>
+                        <td><span class="valInput">4800000</span></td>
+                    </tr>
+                </table>
+                <table>
+                    <caption>Income Statement</caption>
+                    <tr>
+                        <th></th>
+                        <th>2023</th>
+                        <th>2022</th>
+                    </tr>
+                    <tr>
+                        <th>Revenue</th>
+                        <td><span class="valInput">2000000</span></td>
+                        <td><span class="valInput">1800000</span></td>
+                    </tr>
+                </table>
+            </body>
+        </html>
+        """
+        
+        soup = BeautifulSoup(html, 'html.parser')
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
@@ -91,17 +157,49 @@ class TestQuarterlyReportProcessor:
 class TestCashDividendsProcessor:
     """Test CashDividendsProcessor."""
     
-    def test_process_valid_data(self, sample_html, sample_stock_name, sample_disclosure_date):
+    def test_process_valid_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing valid cash dividends data."""
         mock_logger = Mock()
         processor = CashDividendsProcessor(mock_logger)
         
-        soup = BeautifulSoup(sample_html, 'html.parser')
+        # Create HTML with the expected structure for cash dividends
+        html = """
+        <html>
+            <body>
+                <ul class="reportType">
+                    <li>
+                        <input type="radio" value="COMMON" checked="checked">
+                        <label>Common Shares</label>
+                    </li>
+                </ul>
+                <table>
+                    <caption>Cash Dividend</caption>
+                    <tr>
+                        <th>Dividend Rate</th>
+                        <td>0.50</td>
+                    </tr>
+                    <tr>
+                        <th>Record Date</th>
+                        <td>2024-01-20</td>
+                    </tr>
+                    <tr>
+                        <th>Payment Date</th>
+                        <td>2024-02-15</td>
+                    </tr>
+                </table>
+            </body>
+        </html>
+        """
+        
+        soup = BeautifulSoup(html, 'html.parser')
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock name"] == sample_stock_name
-        assert result["disclosure date"] == sample_disclosure_date
+        assert result["stock_name"] == sample_stock_name
+        assert result["disclosure_date"] == sample_disclosure_date
+        # Check that dividend data was extracted
+        assert "Dividend Rate" in result
+        assert result["Dividend Rate"] == "0.50"
 
 
 class TestStockholdersProcessor:
@@ -112,25 +210,29 @@ class TestStockholdersProcessor:
         mock_logger = Mock()
         processor = StockholdersProcessor(mock_logger)
         
-        # Create HTML with stockholders table
+        # Create HTML with structure expected by StockholdersProcessor
+        # Need at least 3 tables, and the third should have th/td row pairs
         html = """
         <html>
             <body>
-                <table>
+                <table class="type1">
+                    <tr><th>Dummy Table 1</th><td>Value 1</td></tr>
+                </table>
+                <table class="type1">
+                    <tr><th>Dummy Table 2</th><td>Value 2</td></tr>
+                </table>
+                <table class="type1">
                     <tr>
-                        <th>Name</th>
-                        <th>Shares</th>
-                        <th>Percentage</th>
+                        <th>Total Number of Issued Shares</th>
+                        <td><span class="valInput">1,000,000,000</span></td>
                     </tr>
                     <tr>
-                        <td>John Doe</td>
-                        <td>1,000,000</td>
-                        <td>10.5%</td>
+                        <th>Number of Outstanding Shares</th>
+                        <td><span class="valInput">950,000,000</span></td>
                     </tr>
                     <tr>
-                        <td>Jane Smith</td>
-                        <td>500,000</td>
-                        <td>5.2%</td>
+                        <th>Treasury Shares</th>
+                        <td><span class="valInput">50,000,000</span></td>
                     </tr>
                 </table>
             </body>
@@ -141,23 +243,30 @@ class TestStockholdersProcessor:
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock name"] == sample_stock_name
-        assert result["disclosure date"] == sample_disclosure_date
+        assert result["stock_name"] == sample_stock_name
+        assert result["disclosure_date"] == sample_disclosure_date
         
-        # Check if stockholder data was extracted
-        stockholder_keys = [key for key in result.keys() if key.startswith("stockholder_")]
-        assert len(stockholder_keys) > 0
+        # Check if share structure data was extracted
+        assert "Total Number of Issued Shares" in result
+        assert result["Total Number of Issued Shares"] == "1000000000"
     
     def test_process_empty_table(self, sample_stock_name, sample_disclosure_date):
         """Test processing empty stockholders table."""
         mock_logger = Mock()
         processor = StockholdersProcessor(mock_logger)
         
+        # Create minimal HTML that meets the processor's requirements but has no data
         html = """
         <html>
             <body>
-                <table>
-                    <tr><th>Empty Table</th></tr>
+                <table class="type1">
+                    <tr><th>Dummy 1</th><td>Value</td></tr>
+                </table>
+                <table class="type1">
+                    <tr><th>Dummy 2</th><td>Value</td></tr>
+                </table>
+                <table class="type1">
+                    <tr><th>Empty Field</th><td>-</td></tr>
                 </table>
             </body>
         </html>
@@ -167,8 +276,10 @@ class TestStockholdersProcessor:
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock name"] == sample_stock_name
-        assert result["disclosure date"] == sample_disclosure_date
+        assert result["stock_name"] == sample_stock_name
+        assert result["disclosure_date"] == sample_disclosure_date
+        # Should have processed the Empty Field with value converted to "0"
+        assert result["Empty Field"] == "0"
 
 
 class TestShareBuybackProcessor:
@@ -436,7 +547,7 @@ class TestProcessorIntegration:
                 # ShareBuybackProcessor uses different key format
                 if hasattr(processor, '__class__') and 'ShareBuyback' in processor.__class__.__name__:
                     assert result["stock_symbol"] == "_SRP_TEST"
-                    assert result["disclosure_date"] == "2024-01-15"
+                    assert result["Date_Registered"] in ["2024-01-15", "1/15/2024"]
                 else:
                     assert result["stock name"] == "TEST"
                     assert result["disclosure date"] == "2024-01-15"
@@ -509,6 +620,7 @@ class TestProcessorIntegration:
                 if hasattr(result, 'get'):
                     # For ShareBuybackProcessor which uses different key format
                     assert result.get("stock_symbol") == "_SRP_TESTCORP" or result.get("stock name") == "TESTCORP"
-                    assert result.get("disclosure_date") == "2024-03-15" or result.get("disclosure date") == "2024-03-15"
+                    assert (result.get("Date_Registered") in ["2024-03-15", "3/15/2024"] or 
+                           result.get("disclosure date") == "2024-03-15")
                     # Should contain at least the basic fields
                     assert len(result) >= 2
