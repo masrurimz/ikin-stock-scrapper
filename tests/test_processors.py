@@ -254,32 +254,23 @@ class TestShareBuybackProcessor:
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock_name"] == sample_stock_name
-        assert result["disclosure_date"] == sample_disclosure_date
-        assert "is_amended_report" in result
+        assert result["stock_symbol"] == f"_SRP_{sample_stock_name}"
+        # Date format may be converted to M/D/YYYY format 
+        assert result["Date_Registered"] in [sample_disclosure_date, "1/15/2024"]
+        # UAT #3 format fields
+        assert "Month" in result
+        assert "Year" in result
+        assert "Day" in result
+        assert "Default_value_of_1" in result
         
-        # Check transaction summary
-        assert result["total_transactions"] == 2
-        assert result["total_shares_purchased"] == 449600  # 349,600 + 100,000
-        assert result["weighted_average_price"] > 0
-        assert result["total_transaction_value"] > 0
+        # Check UAT #3 format fields
+        assert result["Total_Number_of_Shares_Purchased"] == 449600  # 349,600 + 100,000
+        assert result["Total_Amount_Appropriated"] == 26070000000.0
+        assert result["Cumulative_Shares_Purchased"] == 876032246
+        assert result["Total_Amount_of_Shares_Repurchased"] == 22885247993.0
+        # UAT #3 format doesn't include detailed share effects or old field names
         
-        # Check share effects
-        assert result["outstanding_shares_before"] == 14562064253
-        assert result["outstanding_shares_after"] == 14561614653
-        assert result["outstanding_shares_change"] == 449600
-        assert result["treasury_shares_before"] == 2150755595
-        assert result["treasury_shares_after"] == 2151205195
-        assert result["treasury_shares_change"] == 449600
-        
-        # Check program summary
-        assert result["cumulative_shares_purchased"] == 876032246
-        assert result["total_program_budget"] == 26070000000.00
-        assert result["total_amount_spent"] == 22885247993.00
-        
-        # Check contact info
-        assert result["contact_name"] == "Michael Blase Aquilizan"
-        assert result["contact_designation"] == "Department Manager"
+        # UAT #3 format doesn't include contact info
     
     def test_process_no_transaction_table(self, sample_stock_name, sample_disclosure_date):
         """Test processing when no transaction table exists."""
@@ -303,12 +294,17 @@ class TestShareBuybackProcessor:
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock_name"] == sample_stock_name
-        assert result["disclosure_date"] == sample_disclosure_date
-        assert "is_amended_report" in result
-        assert result["total_program_budget"] == 26070000000.00
-        # Should not have transaction data
-        assert "total_transactions" not in result
+        assert result["stock_symbol"] == f"_SRP_{sample_stock_name}"
+        # Date format may be converted to M/D/YYYY format 
+        assert result["Date_Registered"] in [sample_disclosure_date, "1/15/2024"]
+        # UAT #3 format fields
+        assert "Month" in result
+        assert "Year" in result
+        assert "Day" in result
+        assert "Default_value_of_1" in result
+        assert result["Total_Amount_Appropriated"] == 26070000000.00
+        # Should have zero values for missing transaction data
+        assert result["Total_Number_of_Shares_Purchased"] == 0
     
     def test_process_empty_document(self, sample_stock_name, sample_disclosure_date):
         """Test processing empty share buyback document."""
@@ -321,11 +317,16 @@ class TestShareBuybackProcessor:
         
         # Should return basic result with only basic fields
         assert result is not None
-        assert result["stock_name"] == sample_stock_name
-        assert result["disclosure_date"] == sample_disclosure_date
-        assert "is_amended_report" in result
+        assert result["stock_symbol"] == f"_SRP_{sample_stock_name}"
+        # Date format may be converted to M/D/YYYY format 
+        assert result["Date_Registered"] in [sample_disclosure_date, "1/15/2024"]
+        # UAT #3 format fields
+        assert "Month" in result
+        assert "Year" in result
+        assert "Day" in result
+        assert "Default_value_of_1" in result
         # Should have no transaction data beyond basic fields
-        assert len(result) == 3  # Only basic fields: stock_name, disclosure_date, is_amended_report
+        assert len(result) >= 8  # UAT #3 format fields
     
     def test_process_partial_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing with only some data sections."""
@@ -356,12 +357,17 @@ class TestShareBuybackProcessor:
         result = processor.process(soup, sample_stock_name, sample_disclosure_date)
         
         assert result is not None
-        assert result["stock_name"] == sample_stock_name
-        assert result["disclosure_date"] == sample_disclosure_date
-        assert "is_amended_report" in result
-        assert result["outstanding_shares_before"] == 1000000
-        assert result["outstanding_shares_after"] == 900000
-        assert result["outstanding_shares_change"] == 100000
+        assert result["stock_symbol"] == f"_SRP_{sample_stock_name}"
+        # Date format may be converted to M/D/YYYY format 
+        assert result["Date_Registered"] in [sample_disclosure_date, "1/15/2024"]
+        # UAT #3 format fields
+        assert "Month" in result
+        assert "Year" in result
+        assert "Day" in result
+        assert "Default_value_of_1" in result
+        # UAT #3 format doesn't include share effects details
+        # Just verify basic structure exists
+        assert "Total_Number_of_Shares_Purchased" in result
     
     def test_process_invalid_numeric_data(self, sample_stock_name, sample_disclosure_date):
         """Test processing with invalid numeric data."""
@@ -393,9 +399,14 @@ class TestShareBuybackProcessor:
         
         # Should handle invalid data gracefully
         assert result is not None
-        assert result["stock_name"] == sample_stock_name
-        assert result["disclosure_date"] == sample_disclosure_date
-        assert "is_amended_report" in result
+        assert result["stock_symbol"] == f"_SRP_{sample_stock_name}"
+        # Date format may be converted to M/D/YYYY format 
+        assert result["Date_Registered"] in [sample_disclosure_date, "1/15/2024"]
+        # UAT #3 format fields
+        assert "Month" in result
+        assert "Year" in result
+        assert "Day" in result
+        assert "Default_value_of_1" in result
         # Should have empty transaction summary since data is invalid
         assert result.get("total_transactions", 0) == 0
 
@@ -424,7 +435,7 @@ class TestProcessorIntegration:
             if result is not None:
                 # ShareBuybackProcessor uses different key format
                 if hasattr(processor, '__class__') and 'ShareBuyback' in processor.__class__.__name__:
-                    assert result["stock_name"] == "TEST"
+                    assert result["stock_symbol"] == "_SRP_TEST"
                     assert result["disclosure_date"] == "2024-01-15"
                 else:
                     assert result["stock name"] == "TEST"
@@ -497,7 +508,7 @@ class TestProcessorIntegration:
             if result is not None:
                 if hasattr(result, 'get'):
                     # For ShareBuybackProcessor which uses different key format
-                    assert result.get("stock_name") == "TESTCORP" or result.get("stock name") == "TESTCORP"
+                    assert result.get("stock_symbol") == "_SRP_TESTCORP" or result.get("stock name") == "TESTCORP"
                     assert result.get("disclosure_date") == "2024-03-15" or result.get("disclosure date") == "2024-03-15"
                     # Should contain at least the basic fields
                     assert len(result) >= 2

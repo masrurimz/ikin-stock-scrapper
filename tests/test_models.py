@@ -16,6 +16,7 @@ class TestReportType:
         assert ReportType.QUARTERLY.value == "Quarterly Report"
         assert ReportType.CASH_DIVIDENDS.value == "Declaration of Cash Dividends"
         assert ReportType.TOP_100_STOCKHOLDERS.value == "List of Top 100 Stockholders"
+        assert ReportType.SHARE_BUYBACK.value == "Share Buy-Back Transactions"
     
     def test_report_type_from_string(self):
         """Test creating ReportType from string."""
@@ -24,6 +25,7 @@ class TestReportType:
         assert ReportType("Quarterly Report") == ReportType.QUARTERLY
         assert ReportType("Declaration of Cash Dividends") == ReportType.CASH_DIVIDENDS
         assert ReportType("List of Top 100 Stockholders") == ReportType.TOP_100_STOCKHOLDERS
+        assert ReportType("Share Buy-Back Transactions") == ReportType.SHARE_BUYBACK
     
     def test_report_type_invalid(self):
         """Test invalid report type raises ValueError."""
@@ -37,7 +39,8 @@ class TestReportType:
             "Annual Report", 
             "Quarterly Report",
             "Declaration of Cash Dividends",
-            "List of Top 100 Stockholders"
+            "List of Top 100 Stockholders",
+            "Share Buy-Back Transactions"
         }
         actual_types = {rt.value for rt in ReportType}
         assert actual_types == expected_types
@@ -49,3 +52,4 @@ class TestReportType:
         assert hasattr(ReportType, 'QUARTERLY')
         assert hasattr(ReportType, 'CASH_DIVIDENDS')
         assert hasattr(ReportType, 'TOP_100_STOCKHOLDERS')
+        assert hasattr(ReportType, 'SHARE_BUYBACK')
