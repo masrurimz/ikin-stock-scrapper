@@ -448,7 +448,7 @@ def _display_scrape_config(company: str, report_type: str, output: str,
     
     # Show mode with special handling for share buyback reports
     if report_type == "share_buyback":
-        table.add_row("Mode", "Simplified (auto-enabled for share buyback reports)")
+        table.add_row("Mode", "UAT #3 Format (latest record only)")
     elif simplified:
         table.add_row("Mode", "Simplified (6 fields, latest only)")
     else:
@@ -478,7 +478,7 @@ def _display_bulk_config(start_id: int, end_id: int, report_type: str, output: s
     
     # Show mode with special handling for share buyback reports
     if report_type == "share_buyback":
-        table.add_row("Mode", "Simplified (auto-enabled for share buyback reports)")
+        table.add_row("Mode", "UAT #3 Format (latest record only)")
     elif simplified:
         table.add_row("Mode", "Simplified (6 fields, latest only)")
     else:
