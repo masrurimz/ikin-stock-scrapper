@@ -13,7 +13,7 @@ from requests.exceptions import RequestException, ProxyError
 class HTTPClient:
     """HTTP client with retry logic and proxy support."""
     
-    def __init__(self, use_proxies: bool = False, proxies: List[str] = None):
+    def __init__(self, use_proxies: bool = False, proxies: Optional[List[str]] = None):
         """
         Initialize HTTP client.
         
@@ -42,8 +42,8 @@ class HTTPClient:
         self,
         url: str,
         method: str = "get",
-        params: Dict = None,
-        data: Dict = None,
+        params: Optional[Dict] = None,
+        data: Optional[Dict] = None,
         retries: int = 3,
         timeout: int = 30,
     ) -> Optional[requests.Response]:

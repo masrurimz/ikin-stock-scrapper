@@ -890,7 +890,7 @@ def _interactive_settings(ctx: CLIContext, scraper: PSEDataScraper):
             
         elif setting_choice == "2":
             ctx.use_proxies = not ctx.use_proxies
-            scraper.use_proxies = ctx.use_proxies
+            scraper.http_client.use_proxies = ctx.use_proxies
             console.print(f"[green]✓ Proxy {'enabled' if ctx.use_proxies else 'disabled'}[/green]")
             
         elif setting_choice == "3":
