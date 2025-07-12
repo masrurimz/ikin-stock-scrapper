@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pse-scraper"
-version = "2.0.0"
+version = "2.1.0"
 description = "A modern, modular scraper to gather data about cash dividends, top 100 stockholders, annual reports, quarterly reports, and public ownership reports from edge.pse.com.ph"
 authors = ["Muhammad Zahid Masruri <masruri03@gmail.com>"]
 license = "MIT"
