@@ -30,6 +30,7 @@ a = Analysis(
         'pse_scraper.core.processors.annual_report',
         'pse_scraper.core.processors.stockholders',
         'pse_scraper.core.processors.cash_dividends',
+        'pse_scraper.core.processors.share_buyback',
         'pse_scraper.models',
         'pse_scraper.models.report_types',
         'pse_scraper.utils',

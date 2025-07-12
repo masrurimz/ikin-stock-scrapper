@@ -12,8 +12,8 @@ on:
           - ""
           - "ubuntu-latest"
           - "windows-latest"
+          - "macos-13"
           - "macos-latest"
-          - "macos-14"
 
 jobs:
   test-build:
@@ -26,10 +26,10 @@ jobs:
           - os: windows-latest
             platform: windows-x64
             artifact_name: pse-scraper-windows-x64.exe
-          - os: macos-latest
+          - os: macos-13 # Intel x64 runner
             platform: macos-x64
             artifact_name: pse-scraper-macos-x64
-          - os: macos-14 # ARM64 runner
+          - os: macos-latest # ARM64 runner (now default)
             platform: macos-arm64
             artifact_name: pse-scraper-macos-arm64
 

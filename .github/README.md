@@ -29,22 +29,34 @@ This directory contains our modern, efficient CI/CD workflows designed for optim
    - Aggregates all job results
    - Provides clear pass/fail status
 
-### 🚀 [`release.yml`](workflows/release.yml) - Release Automation
-**Triggers:** GitHub release creation
+### 🚀 [`build-executables.yml`](workflows/build-executables.yml) - Release Automation
+**Triggers:** Git tags (`v*`), Manual dispatch
 
-**Strategy:** Cross-platform matrix builds with automatic asset attachment
+**Strategy:** Cross-platform matrix builds with comprehensive testing and checksums
 
 #### Jobs:
-1. **🔨 Build Executables** (Linux, Windows, macOS)
-   - Parallel builds across all platforms
-   - PyInstaller executable generation
-   - Automatic packaging (tar.gz for Unix, zip for Windows)
-   - Auto-attachment to GitHub release
-   - **Produces**: `pse-scraper` (Linux/macOS), `pse-scraper.exe` (Windows)
+1. **🔨 Build Matrix** (Linux, Windows, macOS x64/ARM64)
+   - Parallel builds across 4 platforms
+   - Custom build script with advanced optimization
+   - Executable testing (`--version`, `--help`)
+   - Auto-attachment to GitHub releases on tag push
+   - **Produces**: `pse-scraper-linux-x64`, `pse-scraper-windows-x64.exe`, `pse-scraper-macos-x64`, `pse-scraper-macos-arm64`
 
-2. **✅ Release Success**
-   - Aggregates build results
-   - Confirms all executables attached successfully
+2. **🔐 Checksum Generation**
+   - SHA256 checksums for all executables
+   - Attached to release for verification
+
+### 🧪 [`test-build.yml`](workflows/test-build.yml) - Manual Build Testing
+**Triggers:** Manual dispatch only
+
+**Purpose:** Test executable builds without creating releases
+
+#### Features:
+- Same cross-platform matrix as release builds
+- Platform selection (can build specific OS only)
+- Thorough testing (`--version`, `--help`)
+- Artifacts uploaded for testing (7-day retention)
+- No release attachment - pure testing
 
 ### 🔄 [`dependencies.yml`](workflows/dependencies.yml) - Dependency Management
 **Triggers:** Weekly schedule (Mondays 9 AM UTC), Manual dispatch
@@ -80,7 +92,8 @@ This directory contains our modern, efficient CI/CD workflows designed for optim
 | Workflow | Python Versions | Platforms | Trigger | Duration |
 |----------|----------------|-----------|---------|----------|
 | **CI** | 3.10, 3.11, 3.12 | Ubuntu | Push/PR | ~3-5 min |
-| **Release** | 3.10 | Ubuntu, Windows, macOS | Release | ~6-10 min |
+| **Build Executables** | 3.11 | Ubuntu, Windows, macOS (x64+ARM64) | Tags/Manual | ~8-12 min |
+| **Test Build** | 3.11 | Ubuntu, Windows, macOS (x64+ARM64) | Manual | ~6-10 min |
 | **Dependencies** | 3.10 | Ubuntu | Weekly/Manual | ~2-3 min |
 
 ## 🔐 Required Secrets

@@ -1,4 +1,4 @@
-name: Build Cross-Platform Executables
+name: 🚀 Build & Release Executables
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version tag"
+        description: "Version tag for manual builds"
         required: false
         default: "latest"
       platform:
@@ -19,26 +19,41 @@ on:
           - ""
           - "ubuntu-latest"
           - "windows-latest"
+          - "macos-13"
           - "macos-latest"
-          - "macos-14"
+      create_release:
+        description: "Create GitHub release for manual builds"
+        required: false
+        default: false
+        type: boolean
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
+    name: 🔨 Build ${{ matrix.platform }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             platform: linux-x64
             artifact_name: pse-scraper-linux-x64
+            package_name: pse-scraper-linux-x64.tar.gz
           - os: windows-latest
             platform: windows-x64
             artifact_name: pse-scraper-windows-x64.exe
-          - os: macos-latest
+            package_name: pse-scraper-windows-x64.zip
+          - os: macos-13 # Intel x64 runner
             platform: macos-x64
             artifact_name: pse-scraper-macos-x64
-          - os: macos-14 # ARM64 runner
+            package_name: pse-scraper-macos-x64.tar.gz
+          - os: macos-latest # ARM64 runner (now default)
             platform: macos-arm64
             artifact_name: pse-scraper-macos-arm64
+            package_name: pse-scraper-macos-arm64.tar.gz
 
     defaults:
       run:
@@ -46,7 +61,7 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Check if build should run
+      - name: 🔍 Check if build should run
         id: should-run
         run: |
           if [[ "${{ github.event.inputs.platform }}" == "" || "${{ github.event.inputs.platform }}" == "${{ matrix.os }}" ]]; then
@@ -55,18 +70,18 @@ jobs:
             echo "run=false" >> $GITHUB_OUTPUT
           fi
 
-      - name: Checkout code
+      - name: 📥 Checkout code
         if: steps.should-run.outputs.run == 'true'
         uses: actions/checkout@v4
 
-      - name: Set up Python
+      - name: 🐍 Set up Python 3.11
         if: steps.should-run.outputs.run == 'true'
         id: setup-python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Set UTF-8 encoding (Windows)
+      - name: 🪟 Set UTF-8 encoding (Windows)
         if: steps.should-run.outputs.run == 'true' && runner.os == 'Windows'
         run: |
           echo "PYTHONIOENCODING=utf-8" >> $env:GITHUB_ENV
@@ -74,103 +89,168 @@ jobs:
           chcp 65001
         shell: pwsh
 
-      - name: Install Poetry
+      - name: 📦 Install Poetry
         if: steps.should-run.outputs.run == 'true'
         uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
 
-      - name: Cache Poetry dependencies
+      - name: 💾 Cache Poetry dependencies
         if: steps.should-run.outputs.run == 'true'
         uses: actions/cache@v4
         with:
           path: ~/.cache
           key: venv-${{ runner.os }}-${{ steps.setup-python.outputs.python-version }}-${{ hashFiles('**/poetry.lock') }}
 
-      - name: Install dependencies
+      - name: 🔧 Install dependencies
         if: steps.should-run.outputs.run == 'true'
         run: poetry install --with dev --no-interaction
 
-      - name: Build executable
+      - name: 🔨 Build executable
         if: steps.should-run.outputs.run == 'true'
         run: |
+          echo "Building executable for ${{ matrix.platform }}..."
           poetry run python build_executable.py --clean
 
-      - name: Verify executable exists
+      - name: ✅ Verify executable exists
         if: steps.should-run.outputs.run == 'true'
         run: |
           ls -la releases/
           if [ ! -f "releases/${{ matrix.artifact_name }}" ]; then
-            echo "Error: Executable not found at releases/${{ matrix.artifact_name }}"
+            echo "❌ Error: Executable not found at releases/${{ matrix.artifact_name }}"
             exit 1
           fi
+          echo "✅ Executable found: releases/${{ matrix.artifact_name }}"
 
-      - name: Test executable (Unix)
+      - name: 🧪 Test executable (Unix)
         if: steps.should-run.outputs.run == 'true' && runner.os != 'Windows'
         run: |
           chmod +x releases/${{ matrix.artifact_name }}
+          echo "Testing executable version..."
           ./releases/${{ matrix.artifact_name }} --version
+          echo "Testing executable help..."
+          ./releases/${{ matrix.artifact_name }} --help
 
-      - name: Test executable (Windows)
+      - name: 🧪 Test executable (Windows)
         if: steps.should-run.outputs.run == 'true' && runner.os == 'Windows'
         run: |
           $env:PYTHONIOENCODING = "utf-8"
           $env:PYTHONUTF8 = "1"
           chcp 65001 > $null
+          Write-Host "Testing executable version..."
           & ".\releases\${{ matrix.artifact_name }}" --version
+          Write-Host "Testing executable help..."
+          & ".\releases\${{ matrix.artifact_name }}" --help
         shell: pwsh
 
-      - name: Upload artifact
+      - name: 📦 Create release package
+        if: steps.should-run.outputs.run == 'true'
+        run: |
+          cd releases
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            echo "Creating ZIP package for Windows..."
+            7z a "${{ matrix.package_name }}" "${{ matrix.artifact_name }}"
+          else
+            echo "Creating TAR.GZ package for Unix..."
+            tar -czf "${{ matrix.package_name }}" "${{ matrix.artifact_name }}"
+          fi
+          echo "📊 Package info:"
+          ls -lh "${{ matrix.package_name }}"
+          cd ..
+
+      - name: 📤 Upload build artifact
         if: steps.should-run.outputs.run == 'true'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: releases/${{ matrix.artifact_name }}
+          name: ${{ matrix.platform }}-package
+          path: releases/${{ matrix.package_name }}
           retention-days: 30
 
-      - name: Create Release
-        if: steps.should-run.outputs.run == 'true' && startsWith(github.ref, 'refs/tags/')
+      - name: 🚀 Upload to GitHub Release
+        if: steps.should-run.outputs.run == 'true' && (startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true')
         uses: softprops/action-gh-release@v1
         with:
-          files: releases/${{ matrix.artifact_name }}
+          files: releases/${{ matrix.package_name }}
           draft: false
           prerelease: false
+          tag_name: ${{ github.event.inputs.create_release == 'true' && github.event.inputs.version || github.ref_name }}
+          name: ${{ github.event.inputs.create_release == 'true' && format('PSE Scraper {0}', github.event.inputs.version) || format('PSE Scraper {0}', github.ref_name) }}
+          body: |
+            ## 🚀 PSE Data Scraper Release
+            
+            **Platform:** ${{ matrix.platform }}
+            **Built on:** ${{ runner.os }}
+            **Python:** 3.11
+            
+            ### 📦 Download
+            - **File:** `${{ matrix.package_name }}`
+            - **Size:** See artifact details
+            
+            ### 🛠️ Installation
+            1. Download the appropriate package for your platform
+            2. Extract the executable
+            3. Run `./pse-scraper --help` to get started
+            
+            ### ✨ Features
+            - Share Buy-Back transaction scraping
+            - Public ownership reports
+            - Financial reports (Annual/Quarterly)
+            - Stockholder information
+            - Cash dividend data
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   create-checksums:
+    name: 🔐 Generate Checksums
     needs: build
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: startsWith(github.ref, 'refs/tags/') || github.event.inputs.create_release == 'true'
 
     steps:
-      - name: Download all artifacts
+      - name: 📥 Download all build artifacts
         uses: actions/download-artifact@v4
         with:
           path: ./artifacts
 
-      - name: Create checksums
+      - name: 🔐 Generate SHA256 checksums
         run: |
+          echo "📂 Files in artifacts directory:"
+          find artifacts -type f -name "*.tar.gz" -o -name "*.zip"
+          
+          echo ""
+          echo "🔐 Generating SHA256 checksums..."
           cd artifacts
-          echo "Files in artifacts directory:"
-          find . -type f -name "pse-scraper-*"
-          echo "Generating checksums..."
-          find . -type f -name "pse-scraper-*" -exec sha256sum {} \; > ../checksums.txt
+          
+          # Create checksums for all platform packages
+          find . -type f \( -name "*.tar.gz" -o -name "*.zip" \) -exec sha256sum {} \; | sed 's|./[^/]*/||' > ../checksums.txt
+          
           cd ..
-          echo "Generated checksums:"
+          echo ""
+          echo "✅ Generated checksums:"
           cat checksums.txt
-          echo "## SHA256 Checksums" >> release_notes.md
-          echo "\`\`\`" >> release_notes.md
-          cat checksums.txt >> release_notes.md
-          echo "\`\`\`" >> release_notes.md
+          
+          echo ""
+          echo "📝 Creating release notes section..."
+          echo "## 🔐 SHA256 Checksums" > checksum_notes.md
+          echo "" >> checksum_notes.md
+          echo "Verify your download integrity using these checksums:" >> checksum_notes.md
+          echo "" >> checksum_notes.md
+          echo "\`\`\`" >> checksum_notes.md
+          cat checksums.txt >> checksum_notes.md
+          echo "\`\`\`" >> checksum_notes.md
+          echo "" >> checksum_notes.md
+          echo "### Verification Instructions" >> checksum_notes.md
+          echo "**Linux/macOS:** \`sha256sum -c checksums.txt\`" >> checksum_notes.md
+          echo "**Windows:** \`certUtil -hashfile <filename> SHA256\`" >> checksum_notes.md
 
-      - name: Update Release with checksums
+      - name: 🚀 Upload checksums to release
         uses: softprops/action-gh-release@v1
         with:
           files: |
             checksums.txt
-          body_path: release_notes.md
+          body_path: checksum_notes.md
           append_body: true
+          tag_name: ${{ github.event.inputs.create_release == 'true' && github.event.inputs.version || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
