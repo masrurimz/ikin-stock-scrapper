@@ -184,11 +184,14 @@ jobs:
 
       - name: 🚀 Upload to GitHub Release
         if: steps.should-run.outputs.run == 'true'
-        uses: softprops/action-gh-release@v1
-        with:
-          files: releases/${{ matrix.package_name }}
-          tag_name: ${{ github.event.inputs.release_tag || github.event.release.tag_name }}
-          append_body: false
+        run: |
+          RELEASE_TAG="${{ github.event.inputs.release_tag || github.event.release.tag_name }}"
+          echo "Uploading ${{ matrix.package_name }} to release $RELEASE_TAG"
+          
+          # Upload the file to the release
+          gh release upload "$RELEASE_TAG" "releases/${{ matrix.package_name }}" --clobber
+          
+          echo "✅ Successfully uploaded ${{ matrix.package_name }} to release $RELEASE_TAG"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -236,12 +239,21 @@ jobs:
           echo "**Windows:** \`certUtil -hashfile <filename> SHA256\`" >> checksum_notes.md
 
       - name: 🚀 Upload checksums to release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            checksums.txt
-          body_path: checksum_notes.md
-          append_body: true
-          tag_name: ${{ github.event.inputs.release_tag || github.event.release.tag_name }}
+        run: |
+          RELEASE_TAG="${{ github.event.inputs.release_tag || github.event.release.tag_name }}"
+          echo "Uploading checksums to release $RELEASE_TAG"
+          
+          # Upload checksums file
+          gh release upload "$RELEASE_TAG" "checksums.txt" --clobber
+          
+          # Update release notes with checksum information
+          echo "Updating release notes with checksum information..."
+          CURRENT_NOTES=$(gh release view "$RELEASE_TAG" --json body --jq '.body')
+          NEW_NOTES="$CURRENT_NOTES"$'\n\n'"$(cat checksum_notes.md)"
+          
+          # Update the release with new notes
+          echo "$NEW_NOTES" | gh release edit "$RELEASE_TAG" --notes-file -
+          
+          echo "✅ Successfully uploaded checksums and updated release notes"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
