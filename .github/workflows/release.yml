@@ -1,0 +1,152 @@
+name: 🚀 Release
+
+on:
+  release:
+    types: [created]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # 📦 Build Cross-Platform Executables
+  build-executables:
+    name: 🔨 Build ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            arch: x64
+            executable: pse-scraper
+          - os: windows-latest
+            platform: windows
+            arch: x64
+            executable: pse-scraper.exe
+          - os: macos-latest
+            platform: macos
+            arch: x64
+            executable: pse-scraper
+
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: 📦 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: 💾 Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: .venv
+          key: venv-${{ runner.os }}-3.10-${{ hashFiles('**/poetry.lock') }}
+
+      - name: 📚 Install dependencies
+        run: poetry install --no-interaction
+
+      - name: 🔨 Build executable
+        run: |
+          poetry run pyinstaller pse-scraper.spec
+
+      - name: 📋 Get release info
+        id: release
+        run: |
+          echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          echo "name=${{ github.event.release.name }}" >> $GITHUB_OUTPUT
+
+      - name: 📦 Package executable (Linux/macOS)
+        if: matrix.platform != 'windows'
+        run: |
+          cd dist
+          tar -czf pse-scraper-${{ steps.release.outputs.tag }}-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz ${{ matrix.executable }}
+
+      - name: 📦 Package executable (Windows)
+        if: matrix.platform == 'windows'
+        run: |
+          cd dist
+          Compress-Archive -Path ${{ matrix.executable }} -DestinationPath pse-scraper-${{ steps.release.outputs.tag }}-${{ matrix.platform }}-${{ matrix.arch }}.zip
+
+      - name: 📤 Upload executable to release (Linux/macOS)
+        if: matrix.platform != 'windows'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/pse-scraper-${{ steps.release.outputs.tag }}-${{ matrix.platform }}-${{ matrix.arch }}.tar.gz
+          tag_name: ${{ github.event.release.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 📤 Upload executable to release (Windows)
+        if: matrix.platform == 'windows'
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/pse-scraper-${{ steps.release.outputs.tag }}-${{ matrix.platform }}-${{ matrix.arch }}.zip
+          tag_name: ${{ github.event.release.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 📦 Build Python Package
+  build-package:
+    name: 📦 Build Python Package
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐍 Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: 📦 Install Poetry
+        uses: snok/install-poetry@v1
+        with:
+          version: latest
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+
+      - name: 🔨 Build package
+        run: poetry build
+
+      - name: 📋 Get release info
+        id: release
+        run: |
+          echo "tag=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+
+      - name: 📤 Upload package to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            dist/*.whl
+            dist/*.tar.gz
+          tag_name: ${{ github.event.release.tag_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ✅ Release Success
+  release-success:
+    name: ✅ Release Complete
+    runs-on: ubuntu-latest
+    needs: [build-executables, build-package]
+    if: always()
+    steps:
+      - name: ✅ Mark release as successful
+        if: needs.build-executables.result == 'success' && needs.build-package.result == 'success'
+        run: echo "🎉 Release artifacts successfully attached!"
+        
+      - name: ❌ Mark release as failed
+        if: needs.build-executables.result == 'failure' || needs.build-package.result == 'failure'
+        run: |
+          echo "❌ Release artifact build failed!"
+          exit 1
