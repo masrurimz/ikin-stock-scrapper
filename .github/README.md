@@ -40,14 +40,11 @@ This directory contains our modern, efficient CI/CD workflows designed for optim
    - PyInstaller executable generation
    - Automatic packaging (tar.gz for Unix, zip for Windows)
    - Auto-attachment to GitHub release
+   - **Produces**: `pse-scraper` (Linux/macOS), `pse-scraper.exe` (Windows)
 
-2. **📦 Build Python Package**
-   - Builds wheel and source distribution
-   - Attaches to GitHub release
-
-3. **✅ Release Success**
-   - Aggregates all build results
-   - Provides clear pass/fail status
+2. **✅ Release Success**
+   - Aggregates build results
+   - Confirms all executables attached successfully
 
 ### 🔄 [`dependencies.yml`](workflows/dependencies.yml) - Dependency Management
 **Triggers:** Weekly schedule (Mondays 9 AM UTC), Manual dispatch
@@ -83,7 +80,7 @@ This directory contains our modern, efficient CI/CD workflows designed for optim
 | Workflow | Python Versions | Platforms | Trigger | Duration |
 |----------|----------------|-----------|---------|----------|
 | **CI** | 3.10, 3.11, 3.12 | Ubuntu | Push/PR | ~3-5 min |
-| **Release** | 3.10 | Ubuntu, Windows, macOS | Release | ~8-12 min |
+| **Release** | 3.10 | Ubuntu, Windows, macOS | Release | ~6-10 min |
 | **Dependencies** | 3.10 | Ubuntu | Weekly/Manual | ~2-3 min |
 
 ## 🔐 Required Secrets
@@ -112,10 +109,24 @@ poetry run mypy src/pse_scraper/
 # Tests
 poetry run pytest --cov=pse_scraper
 
-# Build
-poetry build
+# Build executable
 poetry run pyinstaller pse-scraper.spec
+# Output: dist/pse-scraper (or dist/pse-scraper.exe on Windows)
 ```
+
+## 🚀 Release Process
+
+Creating a new release is now fully automated:
+
+1. **Create GitHub release** with tag (e.g., `v2.1.0`)
+2. **Workflow automatically builds** executables for all platforms:
+   - `pse-scraper-v2.1.0-linux-x64.tar.gz` 
+   - `pse-scraper-v2.1.0-windows-x64.zip` (contains `pse-scraper.exe`)
+   - `pse-scraper-v2.1.0-macos-x64.tar.gz`
+3. **All executable files attached** to GitHub release automatically
+4. **Ready for distribution** - no manual steps required!
+
+Users can download the appropriate file for their platform and run the executable directly.
 
 ## 📈 Migration Benefits
 
