@@ -5,7 +5,7 @@ Utility functions for PSE data scraping.
 import re
 import datetime
 import logging
-from typing import Optional
+from typing import Optional, Tuple
 
 
 def clean_text(text: str) -> str:
@@ -94,3 +94,47 @@ def clean_stockholders_text(text):
     text = text.replace('&gt;', '>')
     text = text.replace('&quot;', '"')
     return text
+
+
+def parse_date_registered(date_str: str) -> Optional[Tuple[str, int, int, int]]:
+    """
+    Parse Date Registered into components for UAT #3 format.
+    
+    Args:
+        date_str: Date string from "Date Registered" field
+        
+    Returns:
+        Tuple of (full_date, month, year, day) or None if parsing fails
+    """
+    if not date_str:
+        return None
+        
+    # Clean the date string
+    date_str = date_str.strip()
+    
+    # Try different date formats commonly used in PSE documents
+    formats = [
+        "%m/%d/%Y",      # 5/27/2025
+        "%m/%d/%y",      # 5/27/25  
+        "%d/%m/%Y",      # 27/5/2025
+        "%Y-%m-%d",      # 2025-05-27
+        "%b %d, %Y",     # May 27, 2025
+        "%B %d, %Y",     # May 27, 2025
+    ]
+    
+    for fmt in formats:
+        try:
+            date_obj = datetime.datetime.strptime(date_str, fmt)
+            # Return in M/D/YYYY format as required by UAT #3
+            formatted_date = f"{date_obj.month}/{date_obj.day}/{date_obj.year}"
+            return (
+                formatted_date,
+                date_obj.month,
+                date_obj.year,
+                date_obj.day
+            )
+        except ValueError:
+            continue
+    
+    logging.getLogger(__name__).error(f"Error parsing date registered: {date_str}")
+    return None

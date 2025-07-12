@@ -168,10 +168,7 @@ class PSEDataScraper:
             if progress_callback:
                 progress_callback("initializing", f"Starting scraper for {company_id}")
                 
-            # Auto-enable simplified mode for share buyback reports (UAT Feedback #2)
-            if report_type == ReportType.SHARE_BUYBACK:
-                simplified = True
-                self.logger.info(f"Auto-enabled simplified mode for share buyback report (UAT Feedback #2)")
+            # UAT #3: Share buyback now uses new format by default (no simplified mode override needed)
                 
             self.logger.info(
                 f"Starting data scraping for company_id: {company_id}, report_type: {report_type.value}, simplified: {simplified}"
@@ -512,11 +509,8 @@ class PSEDataScraper:
         elif report_type == ReportType.SHARE_BUYBACK:
             from ..core.processors.share_buyback import ShareBuybackProcessor
             processor = ShareBuybackProcessor(self.logger)
-            result = processor.process(iframe_soup, stock_name, disclosure_date, simplified=getattr(self, 'simplified_mode', False))
-            # Don't stop iteration for share buyback to capture all reports including amendments
-            # But if simplified mode, stop after first successful result
-            if getattr(self, 'simplified_mode', False) and result:
-                self.stop_iteration = True
+            result = processor.process(iframe_soup, stock_name, disclosure_date)
+            # For share buyback, collect all then filter to latest in save_results
         elif report_type == ReportType.CASH_DIVIDENDS and not self.stop_iteration:
             from ..core.processors.cash_dividends import CashDividendsProcessor
             processor = CashDividendsProcessor(self.logger)
@@ -543,6 +537,9 @@ class PSEDataScraper:
             self.logger.info("No data to save")
             print("No data to save")
             return
+
+        # For share buyback: filter to keep only the latest record by Date_Registered
+        self._filter_share_buyback_to_latest()
 
         saved_files = []
 
@@ -585,3 +582,50 @@ class PSEDataScraper:
         if not saved_files:
             self.logger.error("Failed to save file in any format")
             print("Failed to save file in any format")
+
+    def _filter_share_buyback_to_latest(self) -> None:
+        """Filter share buyback data to keep only the latest record per company by Date_Registered."""
+        if not self.data:
+            return
+
+        # Check if this is share buyback data (has Date_Registered field)
+        share_buyback_records = [record for record in self.data if 'Date_Registered' in record]
+        
+        if not share_buyback_records:
+            return
+
+        # Group by company and find latest per company
+        from datetime import datetime
+        from collections import defaultdict
+        
+        company_latest = {}
+        
+        for record in share_buyback_records:
+            try:
+                # Get company identifier
+                company_id = record.get('stock_symbol') or record.get('stock_name') or 'unknown'
+                
+                # Parse the Date_Registered field
+                date_str = record['Date_Registered']
+                # Handle M/D/YYYY format
+                parsed_date = datetime.strptime(date_str, "%m/%d/%Y")
+                
+                # Keep latest record per company
+                if company_id not in company_latest or parsed_date > company_latest[company_id]['date']:
+                    company_latest[company_id] = {
+                        'date': parsed_date,
+                        'record': record
+                    }
+                    
+            except (ValueError, KeyError) as e:
+                self.logger.warning(f"Could not parse date for record: {record.get('Date_Registered', 'Unknown')}")
+                continue
+
+        if company_latest:
+            # Keep latest record per company and any non-share-buyback records
+            non_share_buyback = [record for record in self.data if 'Date_Registered' not in record]
+            latest_records = [item['record'] for item in company_latest.values()]
+            self.data = non_share_buyback + latest_records
+            self.logger.info(f"Filtered to latest share buyback records for {len(company_latest)} companies")
+        else:
+            self.logger.warning("No valid share buyback records found to filter")
