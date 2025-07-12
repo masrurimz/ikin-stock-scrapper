@@ -21,8 +21,12 @@ on:
           - "macos-13"
           - "macos-latest"
 
+permissions:
+  contents: write
+  packages: read
+
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.inputs.release_tag || github.event.release.tag_name || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -67,6 +71,23 @@ jobs:
       - name: 📥 Checkout code
         if: steps.should-run.outputs.run == 'true'
         uses: actions/checkout@v4
+
+      - name: 🔍 Verify release exists
+        if: steps.should-run.outputs.run == 'true'
+        run: |
+          RELEASE_TAG="${{ github.event.inputs.release_tag || github.event.release.tag_name }}"
+          echo "Verifying release exists for tag: $RELEASE_TAG"
+          
+          if ! gh release view "$RELEASE_TAG" &>/dev/null; then
+            echo "❌ Release $RELEASE_TAG not found!"
+            echo "Available releases:"
+            gh release list --limit 5
+            exit 1
+          fi
+          
+          echo "✅ Release $RELEASE_TAG found"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🐍 Set up Python 3.11
         if: steps.should-run.outputs.run == 'true'
